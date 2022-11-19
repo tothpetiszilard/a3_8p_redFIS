@@ -1,0 +1,57 @@
+Communication between the Dashboard and the Navigation (RNS-E)
+- VWTP2.0 is used for the Communication
+- CANID 6C0 is RNS_E
+- CANID 6C1 is Dashboard
+- Messages for showing data on the screen looks like:
+    [cmd] [len] [param] [x] [y] [data] 
+
+Some examples with comments:
+
+52 05 82 00 1B 40 30 // request area (from 0px,27px ?) with size 64x48, bigger area (or different starting point?) causes error (resp 53 c0)
+byte 2: 128 = request response
+52 05 02 00 1B 40 30 // request area 64x48, no response neeeded
+byte 2: 2 means normal (no pixels lit), 3 means inverted (all pixels lit)
+52 05 02 14 1B 2C 14 // no response neeeded
+52 05 02 00 2D 39 16 // no response neeeded
+
+20 3B A0 00 // No clue, response is 21 3B A0 00, last byte can be changed
+
+Compass:
+52 05 02 00 1B 40 30
+57 0E 02 00 15 65 65 65 65 65 65 65 65 65 65 65 (x= 0 y= 21px, fill with spaces, large font is used)
+57 0E 02 00 1F 65 65 65 65 65 65 65 65 65 65 65 (x= 0 y= 31px, fill with spaces, large font is used)
+57 0E 02 00 29 65 65 65 65 65 65 65 65 65 65 65 (x= 0 y= 41px, fill with spaces, large font is used)
+57 0D 26 00 05 65 65 65 65 65 65 65 65 65 65    (x is not changed?, y = 5px, fill with spaces, small font is used)
+57 07 26 00 05 3E 4E 45 3C // <NE> , top center (x is invalid, y = 5 px )
+
+Others:
+57 07 06 00 01 2D 2D 2D 2D // "----" , beginning of first row (0,1)
+57 07 06 00 01 30 63 31 6C // "0.1" , beginning of first row (0,1)
+57 05 06 00 09 0B 0D // "km" , beginning of second row (0,9)
+57 08 06 17 15 44 45 53 54 63 // "DEST." , (23, 21)
+57 08 26 00 29 43 41 4C 43 63 // "CALC." , (? , 41)
+
+byte2: 6 is small font, 2 is large font, B is special font (used for drawing)
+
+33 // delete MFA page or clear screen
+39 // show page?
+
+08 // version req from dash?
+
+01 01 00 // ignition on ,starting up
+01 02 00 // shutdown
+
+20 3B A0 00 // maybe: requesting MFA page, last byte can be changed, resp will be the same
+
+From dash:
+
+53 85 - Showing Nav/Compass page
+53 84 - Showing Doors (car symbol) page or any other system message
+53 05 - Pending?, followed by req '2E' from dash, answer is '2F' (one byte)
+53 04 - Showing a standard FIS page
+53 C0 - Request rejected, error
+00 02 - Shutting down
+00 01 - Starting up
+
+09 20 0B 50 07 29 50 30 39 00 30 00 // Answer to 08?
+21 3B A0 00 // answer to 20 3B A0 ...
