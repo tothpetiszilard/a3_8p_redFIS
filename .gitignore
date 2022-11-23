@@ -29,6 +29,7 @@
 *.dylib
 
 # Executables
+esp32/build
 *.exe
 *.out
 *.app
@@ -50,3 +51,4 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+esp32/.cache
