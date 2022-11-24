@@ -13,7 +13,11 @@ void Can_Init(void)
 {
     twai_general_config_t gcfg = TWAI_GENERAL_CONFIG_DEFAULT(GPIO_NUM_26, GPIO_NUM_32, TWAI_MODE_NORMAL);
     twai_timing_config_t tcfg = TWAI_TIMING_CONFIG_500KBITS();
-    twai_filter_config_t fcfg = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+    twai_filter_config_t fcfg;
+    // Accepted IDs are: 35F (stalk buttons), 6c1 (dash), 201 (gw), 300 (engine)
+    fcfg.acceptance_code = (0x35Fu << 21u) | (0x200u << 5u);
+    fcfg.acceptance_mask = 0x001FB83Fu;
+    fcfg.single_filter = false;
     twai_driver_install(&gcfg, &tcfg, &fcfg);
     twai_start();
     xTaskCreate(Can_Receive, "CanRx", 2048, NULL, 5, &CanTaskHdl);
