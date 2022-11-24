@@ -38,6 +38,28 @@ static void VwTp_Cyclic(void *pvParameters)
     
 }
 
+VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len)
+{
+    VwTp_ChannelType * chPtr = NULL;
+    VwTp_ReturnType retVal = VWTP_ERR;
+    uint8_t i = 0;
+    if (chId < (sizeof(vwtp_channels)/sizeof(vwtp_channels[0])))
+    {
+        chPtr = &vwtp_channels[chId];
+        if (chPtr->txState == VWTP_IDLE)
+        {
+            chPtr->txSize = len;
+            for (i=0; i<len; i++)
+            {
+                chPtr->txBuffer[i] = buffer[i];
+            }
+            chPtr->txState = VWTP_WAIT;
+            retVal = VWTP_OK;
+        }
+    }
+    return retVal;
+}
+
 void VwTp_Receive(uint16_t canId, uint8_t dlc, uint8_t * dataPtr)
 {
     uint8_t i = 0;

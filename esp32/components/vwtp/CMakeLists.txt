@@ -3,6 +3,6 @@ set(COMPONENT_REQUIRES "can")
 set(COMPONENT_PRIV_REQUIRES )
 
 set(COMPONENT_SRCS "vwtp.c" "vwtp_cfg.c" )
-set(COMPONENT_ADD_INCLUDEDIRS "../can")
+set(COMPONENT_ADD_INCLUDEDIRS "../can" "../dashapp")
 
 register_component()

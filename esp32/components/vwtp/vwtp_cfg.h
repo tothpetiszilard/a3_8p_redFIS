@@ -23,7 +23,7 @@ typedef struct
     uint8_t blockSize; // sent frames before ack
     uint8_t ackTimeout; // time until wait for ack
     uint8_t ips; // inter-packet-space, time between two TP frames
-    void (*rxIndication)(uint8_t *data,uint8_t len); //callback: Data rx
+    void (*rxIndication)(uint8_t *data,uint16_t len); //callback: Data rx
     void (*txConfirmation)(void); //callback: Data sent
 }VwTp_ChannelCfgType;
 
