@@ -9,3 +9,4 @@ extern void DashApp_Receive(uint8_t * dataPtr,uint16_t len);
 extern void DashApp_TxConfirmation(void);
 
 #endif //DASHAPP_H
+

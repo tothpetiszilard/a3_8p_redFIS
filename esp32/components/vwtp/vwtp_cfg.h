@@ -11,7 +11,8 @@
 
 typedef enum
 {
-    VWTP_IDLE = 0u,
+    VWTP_CONNECT = 0u,
+    VWTP_IDLE,
     VWTP_WAIT,
     VWTP_ACK,
     VWTP_FINISHED
@@ -39,9 +40,9 @@ typedef struct
     uint16_t txOffset;
     VwTp_StatesType txState;
     VwTp_StatesType rxState;
-    const VwTp_ChannelCfgType cfg;
+    VwTp_ChannelCfgType cfg;
 }VwTp_ChannelType;
 
-extern VwTp_ChannelType vwtp_channels[1];
+extern VwTp_ChannelType vwtp_channels[2];
 
 #endif
