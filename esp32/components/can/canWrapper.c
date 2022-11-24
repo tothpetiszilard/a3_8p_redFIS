@@ -33,7 +33,14 @@ static void Can_Receive(void *pvParameters)
         if(result == ESP_OK)
         {
             // CAN frame received
-            CAN_RXINDICATION(msg.identifier,msg.data_length_code,msg.data);
+            if (CAN_RXID == msg.identifier)
+            {
+                CAN_RXINDICATION(msg.data[1u]);
+            }
+            else 
+            {
+                CANTP_RXINDICATION(msg.identifier,msg.data_length_code,msg.data);
+            }
         }
     }
 }
