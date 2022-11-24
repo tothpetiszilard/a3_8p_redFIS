@@ -227,8 +227,11 @@ static void VwTp_HandleTx(VwTp_ChannelType * const chPtr)
             {
                 msg[tmp+1] = chPtr->txBuffer[tmp+(chPtr->txOffset)];
             }
-            VWTP_SENDMESSAGE(chPtr->cfg.txId,dlc,msg);
-            chPtr->txState = VWTP_FINISHED;
+            if (CAN_OK == VWTP_SENDMESSAGE(chPtr->cfg.txId,dlc,msg))
+            {
+                chPtr->txState = VWTP_ACK;
+            }
+            
         }
         else
         {
@@ -238,15 +241,17 @@ static void VwTp_HandleTx(VwTp_ChannelType * const chPtr)
             {
                 msg[tmp+1u] = chPtr->txBuffer[tmp+(chPtr->txOffset)];
             }
-            VWTP_SENDMESSAGE(chPtr->cfg.txId,dlc,msg);
-            chPtr->txOffset += 7u;
-            if (chPtr->seqCntTx < 0xFu)
+            if (CAN_OK == VWTP_SENDMESSAGE(chPtr->cfg.txId,dlc,msg))
             {
-                chPtr->seqCntTx++;
-            }
-            else
-            {
-                chPtr->seqCntTx = 0u;
+                chPtr->txOffset += 7u;
+                if (chPtr->seqCntTx < 0xFu)
+                {
+                    chPtr->seqCntTx++;
+                }
+                else
+                {
+                    chPtr->seqCntTx = 0u;
+                }
             }
         }
     }

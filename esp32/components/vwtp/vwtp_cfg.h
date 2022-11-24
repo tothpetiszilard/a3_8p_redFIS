@@ -13,6 +13,7 @@ typedef enum
 {
     VWTP_IDLE = 0u,
     VWTP_WAIT,
+    VWTP_ACK,
     VWTP_FINISHED
 }VwTp_StatesType;
 

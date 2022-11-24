@@ -215,7 +215,7 @@ static void DashApp_Print(uint8_t x,uint8_t y,char * string,uint8_t len)
     uint8_t i = 0;
     msg[0] = DASHAPP_CMD_WRITE;
     msg[1] = len+3; // string length + 3
-    msg[2] = 0x02; // params: small font
+    msg[2] = 0x06; // params: small font
     msg[3] = x;
     msg[4] = y;
     for(i=0;i< len;i++)
