@@ -6,10 +6,9 @@
 VwTp_ChannelType vwtp_channels[2] =
 {
     {
-        .txState = VWTP_IDLE, // Non-diag channel
-        .rxState = VWTP_IDLE, // Non-diag channel
         .cfg = 
         {
+            .mode = VWTP_NONDIAG,
             .rxId = 0x6c1u,
             .txId = 0x6c0u,
             .blockSize = 0x0Fu,
@@ -21,10 +20,9 @@ VwTp_ChannelType vwtp_channels[2] =
 
     },
     {
-        .txState = VWTP_CONNECT, // diag channel
-        .rxState = VWTP_CONNECT, // diag channel
         .cfg = 
         {
+            .mode = VWTP_DIAG,
             .rxId = 0x0u,
             .txId = 0x200u,
             .blockSize = 0x0Fu,

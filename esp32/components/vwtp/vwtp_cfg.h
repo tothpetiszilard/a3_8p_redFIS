@@ -18,6 +18,12 @@ typedef enum
     VWTP_FINISHED
 }VwTp_StatesType;
 
+typedef enum
+{
+    VWTP_DIAG = 0u,
+    VWTP_NONDIAG
+}VwTp_ModeType;
+
 typedef struct 
 {
     uint16_t rxId; // canID for reception
@@ -25,6 +31,7 @@ typedef struct
     uint8_t blockSize; // sent frames before ack
     uint8_t ackTimeout; // time until wait for ack
     uint8_t ips; // inter-packet-space, time between two TP frames
+    VwTp_ModeType mode;
     void (*rxIndication)(uint8_t *data,uint16_t len); //callback: Data rx
     void (*txConfirmation)(void); //callback: Data sent
 }VwTp_ChannelCfgType;
