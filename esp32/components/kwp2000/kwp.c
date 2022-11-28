@@ -26,7 +26,8 @@ typedef enum
     KWP_ECUID =   0x1Au,
     KWP_ROUTINE = 0x31u,
     KWP_READDID = 0x21u,
-    KWP_READY =   0x81u
+    KWP_READY =   0x81u,
+    KWP_CLOSE =   0xFFu
 } Kwp_StageType;
 
 static Kwp_StatusType commandStatus = KWP_IDLE;
@@ -47,8 +48,14 @@ void Kwp_Init(uint8_t ecuId)
     {
         commandStatus = KWP_INPROGRESS;
         diagStage = KWP_INIT;
-        xTaskCreate(Kwp_Cyclic, "Kwp2000", 2048, NULL, 5, &KwpTaskHdl);
+        xTaskCreatePinnedToCore(Kwp_Cyclic, "Kwp2000", 1024, NULL, 5, &KwpTaskHdl,1);
     }
+}
+
+Kwp_ReturnType Kwp_GetDataFromECU(uint8_t * dataPtr)
+{
+    Kwp_ReturnType retVal = KWP_ERR;
+    return retVal;
 }
 
 static void Kwp_Cyclic(void *pvParameters)
@@ -72,6 +79,9 @@ static void Kwp_Cyclic(void *pvParameters)
                 //case KWP_READDID:
                 Kwp_ReadData(dataId);
                 break;
+                case KWP_CLOSE:
+                Kwp_DisconnectTp();
+                vTaskDelete(KwpTaskHdl);
                 default:
                 break;
             }
