@@ -36,7 +36,7 @@ void VwTp_Init(void)
             vwtp_channels[i].rxState = VWTP_IDLE;
         }
     }
-    xTaskCreate(VwTp_Cyclic, "VwTp", 2048, NULL, 5, &VwTpTaskHdl);
+    xTaskCreatePinnedToCore(VwTp_Cyclic, "VwTp", 2048, NULL, 5, &VwTpTaskHdl,1);
 }
 
 VwTp_ReturnType VwTp_Connect(uint8_t ecuId)

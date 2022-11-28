@@ -3,6 +3,8 @@
 #include "freertos/task.h"
 #include "dashapp_cfg.h"
 
+#include "string.h"
+
 #define DASHAPP_KEY_OFF (2)
 #define DASHAPP_KL15_ON (1)
 
@@ -15,16 +17,19 @@ typedef enum
     DASHAPP_GETSTATUS=4,
     DASHAPP_SEND2F=5,
     DASHAPP_PREWRITE=6,
-    DASHAPP_WRITE=7,
-    DASHAPP_WRITE2=8,
-    DASHAPP_SHOW=9,
-    DASHAPP_WAIT
+    DASHAPP_SHOW=7,
+    DASHAPP_WRITE=8,
+    DASHAPP_READY=9,
+    DASHAPP_WAIT,
+    DASHAPP_SHUTDOWN
 } DashApp_StateType;
 
 static uint8_t ignitionState = DASHAPP_KEY_OFF;
 static DashApp_StateType appState = DASHAPP_INIT;
 static uint8_t waitForAck = 0;
 static TaskHandle_t DashAppTaskHdl = NULL;
+
+static DashApp_ContentType dspContent;
 
 static void DashApp_Cyclic(void *pvParameters);
 // Rx
@@ -36,7 +41,7 @@ static void DashApp_SendPwrReport(void);
 static void DashApp_GetDashID(void);
 static void DashApp_ReqMfaPage(uint8_t pageId);
 static void DashApp_ReqArea(uint8_t startX,uint8_t startY,uint8_t endX, uint8_t endY, uint8_t response);
-static void DashApp_Print(uint8_t x,uint8_t y,char * string, uint8_t len);
+static void DashApp_Write(void);
 static void DashApp_Send2FResp(void);
 static void DashApp_Show(void);
 static void DashApp_InitDisplay(void);
@@ -46,17 +51,28 @@ void DashApp_Init(void)
 {
     appState = DASHAPP_INIT;
     waitForAck = 0;
-    xTaskCreate(DashApp_Cyclic, "DashApp", 2048, NULL, 5, &DashAppTaskHdl);
+    xTaskCreatePinnedToCore(DashApp_Cyclic, "DashApp", 1024, NULL, 5, &DashAppTaskHdl,1);
 }
 
 static void DashApp_Cyclic(void *pvParameters)
 {
+    static uint8_t initTimeout = 0;
     while(1u)
     {
         if (0 == waitForAck)
         {
             switch(appState)
             {
+                case DASHAPP_INIT:
+                if (initTimeout < 200u)
+                {
+                    initTimeout++;
+                }
+                else 
+                {
+                    initTimeout = 0;
+                    appState = DASHAPP_IDREQ;
+                }
                 case DASHAPP_PWRSTATE:
                 DashApp_SendPwrReport();
                 break;
@@ -76,14 +92,7 @@ static void DashApp_Cyclic(void *pvParameters)
                 DashApp_InitDisplay();
                 break;
                 case DASHAPP_WRITE:
-                // Write demo data 
-                DashApp_Print(0, 1, "A3 8P", 5);
-                if (0 != waitForAck) appState = DASHAPP_WRITE2; // switch if transmit was OK
-                break;
-                case DASHAPP_WRITE2:
-                // Write demo data 
-                DashApp_Print(15, 14, "RED FIS", 7);
-                if (0 != waitForAck) appState = DASHAPP_SHOW; // switch if transmit was OK
+                DashApp_Write();
                 break;
                 case DASHAPP_SHOW:
                 DashApp_Show();// Show page 
@@ -94,6 +103,17 @@ static void DashApp_Cyclic(void *pvParameters)
         }
         vTaskDelay(20 * portTICK_PERIOD_MS);
     }
+}
+
+DashApp_ReturnType DashApp_Print(DashApp_ContentType * content)
+{
+    DashApp_ReturnType retVal = DASHAPP_ERR;
+    if ((DASHAPP_READY == appState) && (NULL != content))
+    {
+        memcpy(&dspContent,content,sizeof(dspContent));
+        appState = DASHAPP_WRITE;
+    }
+    return retVal;
 }
 
 void DashApp_TxConfirmation(void)
@@ -135,7 +155,7 @@ static void DashApp_InitDisplay(void)
     if (VWTP_OK == DASHAPP_SENDTP((uint8_t*)DashApp_DspInit,sizeof(DashApp_DspInit)))
     {
         waitForAck = 1u;
-        appState = DASHAPP_WRITE;
+        appState = DASHAPP_SHOW;
     }
 }
 
@@ -169,7 +189,20 @@ static void DashApp_SendPwrReport(void)
     if (VWTP_OK == DASHAPP_SENDTP(msg,sizeof(msg)))
     {
         waitForAck = 1u;
-        appState = DASHAPP_IDREQ;
+        if (DASHAPP_KEY_OFF != ignitionState)
+        {
+            if (DASHAPP_SHUTDOWN == appState)
+            {
+                xTaskCreatePinnedToCore(DashApp_Cyclic, "DashApp", 2048, NULL, 5, &DashAppTaskHdl,1);
+            }
+            appState = DASHAPP_IDREQ;
+        }
+        else 
+        {
+            appState = DASHAPP_SHUTDOWN;
+            vTaskDelete(DashAppTaskHdl);
+        }
+        
     }
 }
 
@@ -209,22 +242,23 @@ static void DashApp_Send2FResp(void)
     }
 }
 
-static void DashApp_Print(uint8_t x,uint8_t y,char * string,uint8_t len)
+static void DashApp_Write(void)
 {
-    uint8_t msg[len + 5];
+    uint8_t msg[dspContent.len + 5];
     uint8_t i = 0;
     msg[0] = DASHAPP_CMD_WRITE;
-    msg[1] = len+3; // string length + 3
-    msg[2] = 0x06; // params: small font
-    msg[3] = x;
-    msg[4] = y;
-    for(i=0;i< len;i++)
+    msg[1] = dspContent.len + 3; // string length + 3
+    msg[2] = (uint8_t)dspContent.ft; // params: font
+    msg[3] = dspContent.posX;
+    msg[4] = dspContent.posY;
+    for(i=0;i< dspContent.len;i++)
     {
-        msg[5+i] = string[i];
+        msg[5+i] = dspContent.string[i];
     }
     if (VWTP_OK == DASHAPP_SENDTP(msg,sizeof(msg)))
     {
         waitForAck = 1u;
+        appState = DASHAPP_READY;
     }
 }
 
@@ -235,7 +269,7 @@ static void DashApp_Show(void)
     if (VWTP_OK == DASHAPP_SENDTP(msg,sizeof(msg)))
     {
         waitForAck = 1u;
-        appState = DASHAPP_WAIT;
+        appState = DASHAPP_READY;
     }
 }
 
@@ -278,3 +312,4 @@ static void DashApp_HandleDashID(uint8_t * data)
     // TODO: Check part id?
     appState = DASHAPP_PAGEREQ;
 }
+

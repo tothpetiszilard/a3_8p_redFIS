@@ -1,5 +1,5 @@
-#ifndef VWTP_20_H
-#define VWTP_20_H
+#ifndef VWTP_20_H_
+#define VWTP_20_H_
 
 #include "stdint.h"
 
@@ -16,5 +16,5 @@ extern VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len);
 extern void VwTp_Receive(uint16_t canId, uint8_t dlc, uint8_t * dataPtr);
 
 
-#endif //VWTP_20_H
+#endif //VWTP_20_H_
 

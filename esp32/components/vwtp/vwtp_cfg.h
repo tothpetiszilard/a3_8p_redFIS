@@ -1,5 +1,5 @@
-#ifndef VWTP_20_CFG_H
-#define VWTP_20_CFG_H
+#ifndef VWTP_20_CFG_H_
+#define VWTP_20_CFG_H_
 
 #include "stdint.h"
 #include "canWrapper.h"
@@ -52,4 +52,4 @@ typedef struct
 
 extern VwTp_ChannelType vwtp_channels[2];
 
-#endif
+#endif //VWTP_20_CFG_H_

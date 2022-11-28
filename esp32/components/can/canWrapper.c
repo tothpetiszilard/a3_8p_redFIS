@@ -20,7 +20,7 @@ void Can_Init(void)
     fcfg.single_filter = false;
     twai_driver_install(&gcfg, &tcfg, &fcfg);
     twai_start();
-    xTaskCreate(Can_Receive, "CanRx", 2048, NULL, 5, &CanTaskHdl);
+    xTaskCreatePinnedToCore(Can_Receive, "CanRx", 2048, NULL, 5, &CanTaskHdl,1);
 }
 
 static void Can_Receive(void *pvParameters)
