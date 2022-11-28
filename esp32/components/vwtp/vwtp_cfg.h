@@ -42,6 +42,7 @@ typedef struct
     uint8_t seqCntRx;
     uint8_t rxBuffer[VWTP_RXBUFFERSIZE];
     uint8_t txBuffer[VWTP_TXBUFFERSIZE];
+    uint8_t txTimeout;
     uint16_t rxSize;
     uint16_t txSize;
     uint16_t txOffset;

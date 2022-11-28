@@ -24,10 +24,11 @@ typedef enum
     DASHAPP_SHUTDOWN
 } DashApp_StateType;
 
-static uint8_t ignitionState = DASHAPP_KEY_OFF;
+static uint8_t ignitionState = DASHAPP_KL15_ON;
 static DashApp_StateType appState = DASHAPP_INIT;
 static uint8_t waitForAck = 0;
 static TaskHandle_t DashAppTaskHdl = NULL;
+static char DashApp_FixASCII(char c);
 
 static DashApp_ContentType dspContent;
 
@@ -71,8 +72,9 @@ static void DashApp_Cyclic(void *pvParameters)
                 else 
                 {
                     initTimeout = 0;
-                    appState = DASHAPP_IDREQ;
+                    appState = DASHAPP_PWRSTATE;
                 }
+                break;
                 case DASHAPP_PWRSTATE:
                 DashApp_SendPwrReport();
                 break;
@@ -111,7 +113,15 @@ DashApp_ReturnType DashApp_Print(DashApp_ContentType * content)
     if ((DASHAPP_READY == appState) && (NULL != content))
     {
         memcpy(&dspContent,content,sizeof(dspContent));
-        appState = DASHAPP_WRITE;
+        if (content->mode == DASHAPP_ADD)
+        {
+            appState = DASHAPP_WRITE;
+        }
+        else 
+        {
+            appState = DASHAPP_PREWRITE;
+        }
+        retVal = DASHAPP_OK;
     }
     return retVal;
 }
@@ -144,6 +154,11 @@ void DashApp_Receive(uint8_t * dataPtr,uint16_t len)
         case DASHAPP_CMD_REQSTATUS:
         DashApp_HandleReqStatus(dataPtr[1]);
         // response to 52 (read?)
+        break;
+        case DASHAPP_CMD_ERR:
+        DASHAPP_DISCONNECT();
+        appState = DASHAPP_INIT;
+        waitForAck = 0;
         break;
         default:
         break;
@@ -199,8 +214,9 @@ static void DashApp_SendPwrReport(void)
         }
         else 
         {
-            appState = DASHAPP_SHUTDOWN;
-            vTaskDelete(DashAppTaskHdl);
+            //appState = DASHAPP_SHUTDOWN;
+            //vTaskDelete(DashAppTaskHdl);
+            //DASHAPP_DISCONNECT();
         }
         
     }
@@ -246,18 +262,25 @@ static void DashApp_Write(void)
 {
     uint8_t msg[dspContent.len + 5];
     uint8_t i = 0;
-    msg[0] = DASHAPP_CMD_WRITE;
-    msg[1] = dspContent.len + 3; // string length + 3
-    msg[2] = (uint8_t)dspContent.ft; // params: font
-    msg[3] = dspContent.posX;
-    msg[4] = dspContent.posY;
-    for(i=0;i< dspContent.len;i++)
+    if (0u < dspContent.len)
     {
-        msg[5+i] = dspContent.string[i];
+        msg[0] = DASHAPP_CMD_WRITE;
+        msg[1] = dspContent.len + 3; // string length + 3
+        msg[2] = (uint8_t)dspContent.ft; // params: font
+        msg[3] = dspContent.posX;
+        msg[4] = dspContent.posY;
+        for(i=0;i< dspContent.len;i++)
+        {
+            msg[5+i] = DashApp_FixASCII(dspContent.string[i]);
+        }
+        if (VWTP_OK == DASHAPP_SENDTP(msg,sizeof(msg)))
+        {
+            waitForAck = 1u;
+            appState = DASHAPP_READY;
+        }
     }
-    if (VWTP_OK == DASHAPP_SENDTP(msg,sizeof(msg)))
+    else
     {
-        waitForAck = 1u;
         appState = DASHAPP_READY;
     }
 }
@@ -284,7 +307,9 @@ static void DashApp_HandleReqStatus(uint8_t val)
     if (0xC0 == val)
     {
         // Request rejected, parameter error
-        // back to DASHAPP_GETSTATUS ?
+        DASHAPP_DISCONNECT();
+        appState = DASHAPP_INIT;
+        waitForAck = 0;
     }
     else if (0x05 == val)
     {
@@ -294,6 +319,7 @@ static void DashApp_HandleReqStatus(uint8_t val)
     else if ((0x04 == val) || (0x84 == val))
     {
         // Request OK, busy, wait for 85
+        appState = DASHAPP_WAIT;
     }
     else if (0x85 == val)
     {
@@ -313,3 +339,35 @@ static void DashApp_HandleDashID(uint8_t * data)
     appState = DASHAPP_PAGEREQ;
 }
 
+static char DashApp_FixASCII(char c)
+{
+    char retVal;
+    switch(c)
+    {
+        case 'a':
+        case 'b':
+        case 'c':
+        case 'd':
+        case 'e':
+        case 'f':
+        case 'g':
+        case 'h':
+        case 'i':
+        case 'j':
+        case 'k':
+        case 'l':
+        case 'm':
+        case 'n':
+        case 'o':
+        case 'p':
+        retVal = (c-(char)96);
+        break;
+        case ' ':
+        retVal = (char)0x65;
+        break;
+        default:
+        retVal = c;
+        break;
+    }
+    return retVal;
+}

@@ -3,7 +3,6 @@
 #include "stddef.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include <stdint.h>
 
 #define VWTP_PARAMS_RESPONSE    (1u)
 #define VWTP_PARAMS_REQUEST     (0u)
@@ -17,6 +16,7 @@ static void VwTp_HandleCallbacks(VwTp_ChannelType * const chPtr);
 static void VwTp_sendTpParams(VwTp_ChannelType * const chPtr, uint8_t response);
 static void VwTp_sendClose(VwTp_ChannelType * const chPtr);
 static void VwTp_sendAck(VwTp_ChannelType * const chPtr);
+static void VwTp_HandleTxTimeout(VwTp_ChannelType * const chPtr);
 
 static void VwTp_Cyclic(void *pvParameters);
 
@@ -25,16 +25,9 @@ void VwTp_Init(void)
     uint8_t i = 0;
     for (i = 0;i < (sizeof(vwtp_channels)/sizeof(vwtp_channels[0]));i++ )
     {
-        if (VWTP_DIAG == vwtp_channels[i].cfg.mode)
-        {
-            vwtp_channels[i].txState = VWTP_CONNECT;
-            vwtp_channels[i].rxState = VWTP_CONNECT;
-        }
-        else 
-        {
-            vwtp_channels[i].txState = VWTP_IDLE;
-            vwtp_channels[i].rxState = VWTP_IDLE;
-        }
+        vwtp_channels[i].txState = VWTP_CONNECT;
+        vwtp_channels[i].rxState = VWTP_CONNECT;
+
     }
     xTaskCreatePinnedToCore(VwTp_Cyclic, "VwTp", 2048, NULL, 5, &VwTpTaskHdl,1);
 }
@@ -74,6 +67,46 @@ VwTp_ReturnType VwTp_Connect(uint8_t ecuId)
     return retVal;
 }
 
+static void VwTp_HandleTxTimeout(VwTp_ChannelType * const chPtr)
+{
+    uint8_t ackCfg = 0;
+    if (VWTP_ACK == chPtr->txState)
+    {
+        if (0x80 == (chPtr->cfg.ackTimeout & 0xC0u))
+        {
+            // multiplier: 10 ms
+            ackCfg = (chPtr->cfg.ackTimeout & 0x3Fu); // we are already in 10ms scale
+        }
+        else if (0x40 == (chPtr->cfg.ackTimeout & 0xC0u))
+        {
+            // multiplier: 1 ms
+            ackCfg = (chPtr->cfg.ackTimeout & 0x3Fu)/10u; // we are in 10ms scale
+        }
+        else if (0xC0 == (chPtr->cfg.ackTimeout & 0xC0u))
+        {
+            // multiplier: 100 ms
+            ackCfg = (chPtr->cfg.ackTimeout & 0x3Fu) * 10u; // we are in 10ms scale
+        }
+        if (chPtr->txTimeout >= ackCfg)
+        {
+            // timeout, resend
+            chPtr->txOffset = 0;
+            chPtr->txState = VWTP_WAIT;
+            chPtr->txTimeout = 0;
+        }
+        else
+        {
+            // waiting for ACK
+            chPtr->txTimeout++;
+        }
+    }
+    else
+    {
+        // Normal communication
+        chPtr->txTimeout = 0;
+    }
+}
+
 static void VwTp_Cyclic(void *pvParameters)
 {
     uint8_t chId = 0;
@@ -85,7 +118,7 @@ static void VwTp_Cyclic(void *pvParameters)
             chPtr = &vwtp_channels[chId];
             VwTp_HandleTx(chPtr); // TODO: Requesting ACK after x transmitted frames 
             VwTp_HandleCallbacks(chPtr);
-            //TODO: Timout handling is not implemented
+            VwTp_HandleTxTimeout(chPtr);
             
         }
         vTaskDelay(10 * portTICK_PERIOD_MS);
@@ -114,6 +147,18 @@ VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len)
             xTaskResumeAll(); // End of critical section, interrupts enabled
             retVal = VWTP_OK;
         }
+        else if ((chPtr->txState == VWTP_CONNECT) && (chPtr->cfg.mode != VWTP_DIAG ))
+        {
+            // Try to open channel
+            chPtr->txState = VWTP_IDLE;
+            VwTp_sendTpParams(chPtr, VWTP_PARAMS_REQUEST);
+            chPtr->txState = VWTP_CONNECT;
+            chPtr->rxState = VWTP_IDLE;
+        }
+        else 
+        {
+            // Do nothing, return error
+        }
     }
     return retVal;
 }
@@ -132,13 +177,13 @@ void VwTp_Receive(uint16_t canId, uint8_t dlc, uint8_t * dataPtr)
     }
     if (NULL != chPtr)
     {
-        if (chPtr->rxState != VWTP_CONNECT)
+        if ((chPtr->rxState == VWTP_CONNECT) && (chPtr->cfg.mode == VWTP_DIAG ))
         {
-            VwTp_HandleRx(chPtr,dlc,dataPtr);
+            VwTp_HandleConnect(chPtr,dataPtr);
         }
         else 
         {
-            VwTp_HandleConnect(chPtr,dataPtr);
+            VwTp_HandleRx(chPtr,dlc,dataPtr);
         }
     }
 }
@@ -155,7 +200,7 @@ void VwTp_Disconnect(uint8_t chId)
         chPtr->rxSize = 0;
         chPtr->txSize = 0;
         chPtr->rxState = VWTP_IDLE;
-        chPtr->txState = VWTP_IDLE;
+        chPtr->txState = VWTP_CONNECT;
         xTaskResumeAll(); // End of critical section, interrupts enabled
         VwTp_sendClose(chPtr);
         // Reset diagnostics

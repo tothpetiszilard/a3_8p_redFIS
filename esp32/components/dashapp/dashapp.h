@@ -25,7 +25,7 @@ typedef struct
     uint8_t posX;
     uint8_t posY;
     uint8_t len;
-    char string[10];
+    char string[14];
     DashApp_FontType ft;
     DashApp_ModeType mode;
 }DashApp_ContentType;

@@ -7,6 +7,7 @@
 #define DASHAPP_CMD_PWRREPORT           ((uint8_t)0x01u)
 #define DASHAPP_CMD_IDREQ               ((uint8_t)0x08u)
 #define DASHAPP_CMD_ID                  ((uint8_t)0x09u)
+#define DASHAPP_CMD_ERR                 ((uint8_t)0x0Bu)
 #define DASHAPP_CMD_PAGEREQ             ((uint8_t)0x20u)
 #define DASHAPP_CMD_PAGERESP            ((uint8_t)0x21u)
 #define DASHAPP_CMD_2E_REQ              ((uint8_t)0x2Eu)
@@ -18,6 +19,7 @@
 #define DASHAPP_CMD_WRITE               ((uint8_t)0x57u)
 
 #define DASHAPP_SENDTP(buffer, len)     (VwTp_Send(0u, buffer, len))
+#define DASHAPP_DISCONNECT()            (VwTp_Disconnect(0u))
 
 const uint8_t DashApp_DspInit[] = 
 {
