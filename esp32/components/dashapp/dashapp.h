@@ -1,5 +1,5 @@
-#ifndef DASHAPP_H
-#define DASHAPP_H
+#ifndef DASHAPP_H_
+#define DASHAPP_H_
 
 #include "stdint.h"
 
@@ -32,10 +32,10 @@ typedef struct
 
 extern void DashApp_Init(void);
 
-extern DashApp_ReturnType DashApp_Print(DashApp_ContentType * content);
+extern DashApp_ReturnType DashApp_Print(const DashApp_ContentType * const content);
 
 extern void DashApp_Receive(uint8_t * dataPtr,uint16_t len);
 extern void DashApp_TxConfirmation(void);
 
-#endif //DASHAPP_H
+#endif //DASHAPP_H_
 

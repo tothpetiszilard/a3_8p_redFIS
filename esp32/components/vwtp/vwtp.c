@@ -4,9 +4,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#define VWTP_PARAMS_RESPONSE    (1u)
-#define VWTP_PARAMS_REQUEST     (0u)
-
 static TaskHandle_t VwTpTaskHdl = NULL;
 
 static void VwTp_HandleTx(VwTp_ChannelType * const chPtr);
@@ -91,8 +88,16 @@ static void VwTp_HandleTxTimeout(VwTp_ChannelType * const chPtr)
         {
             // timeout, resend
             chPtr->txOffset = 0;
-            chPtr->txState = VWTP_WAIT;
+            if (chPtr->txSize > 0)
+            {
+                chPtr->txState = VWTP_WAIT;
+            }
+            else
+            {
+                chPtr->txState = VWTP_IDLE;
+            }
             chPtr->txTimeout = 0;
+            
         }
         else
         {
@@ -116,14 +121,12 @@ static void VwTp_Cyclic(void *pvParameters)
         for (chId = 0;chId < (sizeof(vwtp_channels)/sizeof(vwtp_channels[0]));chId++ )
         {
             chPtr = &vwtp_channels[chId];
+            VwTp_HandleTxTimeout(chPtr);
             VwTp_HandleTx(chPtr); // TODO: Requesting ACK after x transmitted frames 
             VwTp_HandleCallbacks(chPtr);
-            VwTp_HandleTxTimeout(chPtr);
-            
+            vTaskDelay((10u/(sizeof(vwtp_channels)/sizeof(vwtp_channels[0]))) / portTICK_PERIOD_MS);
         }
-        vTaskDelay(10 * portTICK_PERIOD_MS);
     }
-    
 }
 
 VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len)
@@ -150,9 +153,7 @@ VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len)
         else if ((chPtr->txState == VWTP_CONNECT) && (chPtr->cfg.mode != VWTP_DIAG ))
         {
             // Try to open channel
-            chPtr->txState = VWTP_IDLE;
-            VwTp_sendTpParams(chPtr, VWTP_PARAMS_REQUEST);
-            chPtr->txState = VWTP_CONNECT;
+            chPtr->txFlags.params = VWTP_TPPARAMS_REQUEST;
             chPtr->rxState = VWTP_IDLE;
         }
         else 
@@ -194,25 +195,7 @@ void VwTp_Disconnect(uint8_t chId)
     if (chId < (sizeof(vwtp_channels)/sizeof(vwtp_channels[0])))
     {
         chPtr = &vwtp_channels[chId];
-        vTaskSuspendAll(); // Critical section, interrupts enabled
-        chPtr->seqCntTx = 0;
-        chPtr->seqCntRx = 0;
-        chPtr->rxSize = 0;
-        chPtr->txSize = 0;
-        chPtr->rxState = VWTP_IDLE;
-        chPtr->txState = VWTP_CONNECT;
-        xTaskResumeAll(); // End of critical section, interrupts enabled
         VwTp_sendClose(chPtr);
-        // Reset diagnostics
-        if (VWTP_DIAG == chPtr->cfg.mode)
-        {
-            vTaskSuspendAll(); // Critical section, interrupts enabled
-            chPtr->rxState = VWTP_CONNECT;
-            chPtr->txState = VWTP_CONNECT;
-            chPtr->cfg.txId = 0x200u;
-            chPtr->cfg.rxId = 0;
-            xTaskResumeAll(); // End of critical section, interrupts enabled
-        }
     }
 }
 
@@ -226,8 +209,8 @@ static void VwTp_HandleConnect(VwTp_ChannelType * chPtr,uint8_t * dataPtr)
         chPtr->cfg.txId = (dataPtr[4] | (dataPtr[5]<<8u));
         chPtr->rxState = VWTP_IDLE;
         chPtr->txState = VWTP_IDLE;
+        chPtr->txFlags.params = VWTP_TPPARAMS_REQUEST;
         xTaskResumeAll(); // End of critical section, interrupts enabled
-        VwTp_sendTpParams(chPtr,VWTP_PARAMS_REQUEST);
     }
 }
 
@@ -237,7 +220,11 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
     if ((0xA3u == dataPtr[0]) || (0xA0u == dataPtr[0]))
     {
         // Connection init or alive check
-        VwTp_sendTpParams(chPtr,VWTP_PARAMS_RESPONSE);
+        if (chPtr->txState == VWTP_CONNECT)
+        {
+            chPtr->txState = VWTP_IDLE;
+        }
+        chPtr->txFlags.params = VWTP_TPPARAMS_RESPONSE;
     }
     else if (0xA1u == dataPtr[0])
     {
@@ -267,8 +254,8 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
             }
             chPtr->rxSize += (dlc-1);
         }
+        chPtr->txFlags.ack = 1u; // Ack + rxIndication
         xTaskResumeAll(); // End of critical section, interrupts enabled
-        VwTp_sendAck(chPtr); // Ack + rxIndication
     }
     else if ((0x20u == (dataPtr[0] & 0xF0u)) || (0u == (dataPtr[0] & 0xF0u)))
     {
@@ -280,11 +267,11 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
             chPtr->rxBuffer[chPtr->rxSize + i] = dataPtr[i+1];
         }
         chPtr->rxSize += (dlc-1);
-        xTaskResumeAll(); // End of critical section, interrupts enabled
         if (0 == (dataPtr[0] & 0xF0u))
         {
-            VwTp_sendAck(chPtr);
+            chPtr->txFlags.ack = 1u; // Ack + rxIndication
         }
+        xTaskResumeAll(); // End of critical section, interrupts enabled
     }
     else if (0xB0u == (dataPtr[0] & 0xF0u))
     {
@@ -298,23 +285,7 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
     else if (0xA8u == dataPtr[0])
     {
         // Connection was terminated
-        vTaskSuspendAll(); // Critical section, interrupts enabled
-        chPtr->seqCntTx = 0;
-        chPtr->seqCntRx = 0;
-        chPtr->rxSize = 0;
-        chPtr->txSize = 0;
-        chPtr->rxState = VWTP_IDLE;
-        chPtr->txState = VWTP_IDLE;
         VwTp_sendClose(chPtr);
-        // Reset diagnostics
-        if (chPtr->cfg.mode == VWTP_DIAG)
-        {
-            chPtr->rxState = VWTP_CONNECT;
-            chPtr->txState = VWTP_CONNECT;
-            chPtr->cfg.txId = 0x200u;
-            chPtr->cfg.rxId = 0;
-        }
-        xTaskResumeAll(); // End of critical section, interrupts enabled
     }
     else
     {
@@ -327,36 +298,56 @@ static void VwTp_sendAck(VwTp_ChannelType * const chPtr)
 {
     uint8_t msg[1];
     uint8_t ackSeq;
-    if (chPtr->txState == VWTP_IDLE)
+    
+    if (chPtr->seqCntRx < 0x0Fu)
     {
-        if (chPtr->seqCntRx < 0x0Fu)
-        {
-            ackSeq = chPtr->seqCntRx+1;
-        }
-        else
-        {
-            ackSeq = 0;
-        }
-        msg[0] = 0xB0u | ackSeq; // ack
-        VWTP_SENDMESSAGE(chPtr->cfg.txId,sizeof(msg),msg);
+        ackSeq = chPtr->seqCntRx+1;
+    }
+    else
+    {
+        ackSeq = 0;
+    }
+    msg[0] = 0xB0u | ackSeq; // ack
+    if (CAN_OK == VWTP_SENDMESSAGE(chPtr->cfg.txId,sizeof(msg),msg))
+    {
+        vTaskSuspendAll(); // Critical section, interrupts enabled
+        chPtr->txFlags.ack = 0u;
         // reset states to receive the next msg
         chPtr->rxState = VWTP_FINISHED;
+        xTaskResumeAll(); // End of critical section, interrupts enabled
     }
 }
 
 static void VwTp_sendClose(VwTp_ChannelType * const chPtr)
 {
     uint8_t tpClose[1] = {0xA8u};
-    if (chPtr->txState == VWTP_IDLE)
+    
+    vTaskSuspendAll(); // Critical section, interrupts enabled
+    chPtr->seqCntTx = 0;
+    chPtr->seqCntRx = 0;
+    chPtr->rxSize = 0;
+    chPtr->txSize = 0;
+    chPtr->rxState = VWTP_IDLE;
+    chPtr->txState = VWTP_CONNECT;
+    xTaskResumeAll(); // End of critical section, interrupts enabled
+    VWTP_SENDMESSAGE(chPtr->cfg.txId,sizeof(tpClose),tpClose);
+    // Reset diagnostics
+    if (VWTP_DIAG == chPtr->cfg.mode)
     {
-        VWTP_SENDMESSAGE(chPtr->cfg.txId,sizeof(tpClose),tpClose);
+        vTaskSuspendAll(); // Critical section, interrupts enabled
+        chPtr->rxState = VWTP_CONNECT;
+        chPtr->txState = VWTP_CONNECT;
+        chPtr->cfg.txId = 0x200u;
+        chPtr->cfg.rxId = 0;
+        xTaskResumeAll(); // End of critical section, interrupts enabled
     }
 }
 
 static void VwTp_sendTpParams(VwTp_ChannelType * const chPtr, uint8_t response)
 {
     uint8_t tpParams[6];
-    if ((chPtr->txState == VWTP_IDLE) && (response < 2))
+    
+    if (response < 2)
     {
         tpParams[0u] = 0xA0u | response; // params resp
         tpParams[1u] = chPtr->cfg.blockSize; // msg num before ack
@@ -364,7 +355,10 @@ static void VwTp_sendTpParams(VwTp_ChannelType * const chPtr, uint8_t response)
         tpParams[3u] = 0xFFu; // dummy
         tpParams[4u] = chPtr->cfg.ips; // timing2
         tpParams[5u] = 0xFFu; // dummy
-        VWTP_SENDMESSAGE(chPtr->cfg.txId,sizeof(tpParams),tpParams);
+        if (CAN_OK == VWTP_SENDMESSAGE(chPtr->cfg.txId,sizeof(tpParams),tpParams))
+        {
+            chPtr->txFlags.params = 0;
+        }
     }
 }
 
@@ -377,8 +371,10 @@ static void VwTp_HandleCallbacks(VwTp_ChannelType * const chPtr)
         {
             chPtr->cfg.rxIndication(chPtr->rxBuffer,chPtr->rxSize);
         }
+        vTaskSuspendAll(); // Critical section, interrupts enabled
         chPtr->rxSize = 0u;
         chPtr->rxState = VWTP_IDLE;
+        xTaskResumeAll(); // End of critical section, interrupts enabled
     }
     if (chPtr->txState == VWTP_FINISHED)
     {
@@ -396,7 +392,7 @@ static void VwTp_HandleTx(VwTp_ChannelType * const chPtr)
     uint8_t dlc;
     uint8_t msg[8];
     
-    if (chPtr->txState == VWTP_WAIT)
+    if ( VWTP_WAIT == chPtr->txState )
     {
         if ((chPtr->txSize < 8u) || (((chPtr->txSize)-(chPtr->txOffset)) < 8u))
         {
@@ -418,7 +414,7 @@ static void VwTp_HandleTx(VwTp_ChannelType * const chPtr)
                 msg[0] = 0xA3; // alive check
                 if (CAN_OK == VWTP_SENDMESSAGE(chPtr->cfg.txId,dlc,msg))
                 {
-                    chPtr->txState = VWTP_ACK;
+                    chPtr->txState = VWTP_FINISHED;
                 }
             }
         }
@@ -443,6 +439,18 @@ static void VwTp_HandleTx(VwTp_ChannelType * const chPtr)
                 }
             }
         }
+    }
+    else if ((VWTP_IDLE == chPtr->txState) && (0 != chPtr->txFlags.ack))
+    {
+        VwTp_sendAck(chPtr);
+    }
+    else if (((VWTP_IDLE == chPtr->txState) || (VWTP_CONNECT == chPtr->txState)) && (0 != chPtr->txFlags.params))
+    {
+        VwTp_sendTpParams(chPtr, (chPtr->txFlags.params & VWTP_TPPARAMS_MASK));
+    }
+    else
+    {
+        // No task to do
     }
 }
 

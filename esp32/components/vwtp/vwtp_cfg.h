@@ -9,6 +9,10 @@
 
 #define VWTP_SENDMESSAGE(id,len,dataPtr)      (Can_Write(id,len,dataPtr))
 
+#define VWTP_TPPARAMS_MASK      (1u)
+#define VWTP_TPPARAMS_REQUEST   (2u)
+#define VWTP_TPPARAMS_RESPONSE  (3u)
+
 typedef enum
 {
     VWTP_CONNECT = 0u,
@@ -23,6 +27,12 @@ typedef enum
     VWTP_DIAG = 0u,
     VWTP_NONDIAG
 }VwTp_ModeType;
+
+typedef struct
+{
+    uint8_t ack : 1;
+    uint8_t params :2; // 2 = req, 3 = resp
+} VwTp_TxTasks;
 
 typedef struct 
 {
@@ -48,6 +58,7 @@ typedef struct
     uint16_t txOffset;
     VwTp_StatesType txState;
     VwTp_StatesType rxState;
+    VwTp_TxTasks txFlags;
     VwTp_ChannelCfgType cfg;
 }VwTp_ChannelType;
 

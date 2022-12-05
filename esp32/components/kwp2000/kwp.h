@@ -10,7 +10,8 @@ typedef uint8_t Kwp_ReturnType;
 
 extern void Kwp_Init(uint8_t ecuId);
 
-extern Kwp_ReturnType Kwp_GetDataFromECU(uint8_t * dataPtr);
+extern Kwp_ReturnType Kwp_RequestData(uint8_t did);
+extern Kwp_ReturnType Kwp_GetDataFromECU(uint8_t * const dataPtr);
 
 extern void Kwp_Receive(uint8_t * dataPtr,uint16_t len);
 extern void Kwp_TxConfirmation(void);

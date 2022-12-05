@@ -3,8 +3,6 @@
 #include "freertos/task.h"
 #include "dashapp_cfg.h"
 
-#include "string.h"
-
 #define DASHAPP_KEY_OFF (2)
 #define DASHAPP_KL15_ON (1)
 
@@ -27,6 +25,7 @@ typedef enum
 static uint8_t ignitionState = DASHAPP_KL15_ON;
 static DashApp_StateType appState = DASHAPP_INIT;
 static uint8_t waitForAck = 0;
+static uint8_t retryCnt = 0;
 static TaskHandle_t DashAppTaskHdl = NULL;
 static char DashApp_FixASCII(char c);
 
@@ -52,7 +51,9 @@ void DashApp_Init(void)
 {
     appState = DASHAPP_INIT;
     waitForAck = 0;
-    xTaskCreatePinnedToCore(DashApp_Cyclic, "DashApp", 1024, NULL, 5, &DashAppTaskHdl,1);
+    retryCnt = 0;
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    xTaskCreatePinnedToCore(DashApp_Cyclic, "DashApp", 2048, NULL, 5, &DashAppTaskHdl,1);
 }
 
 static void DashApp_Cyclic(void *pvParameters)
@@ -65,7 +66,7 @@ static void DashApp_Cyclic(void *pvParameters)
             switch(appState)
             {
                 case DASHAPP_INIT:
-                if (initTimeout < 200u)
+                if (initTimeout < 120u)
                 {
                     initTimeout++;
                 }
@@ -103,17 +104,28 @@ static void DashApp_Cyclic(void *pvParameters)
                 break;
             }
         }
-        vTaskDelay(20 * portTICK_PERIOD_MS);
+        vTaskDelay(30 / portTICK_PERIOD_MS);
     }
 }
 
-DashApp_ReturnType DashApp_Print(DashApp_ContentType * content)
+DashApp_ReturnType DashApp_Print(const DashApp_ContentType * const content)
 {
     DashApp_ReturnType retVal = DASHAPP_ERR;
+    uint8_t tmp;
     if ((DASHAPP_READY == appState) && (NULL != content))
     {
-        memcpy(&dspContent,content,sizeof(dspContent));
-        if (content->mode == DASHAPP_ADD)
+        vTaskSuspendAll(); // Critical section, interrupts enabled
+        dspContent.ft = content->ft;
+        dspContent.len = content->len;
+        dspContent.mode = content->mode;
+        dspContent.posX = content->posX;
+        dspContent.posY = content->posY;
+        for (tmp=0; tmp < dspContent.len; tmp++)
+        {
+            dspContent.string[tmp] = content->string[tmp];
+        }
+        
+        if (dspContent.mode == DASHAPP_ADD)
         {
             appState = DASHAPP_WRITE;
         }
@@ -122,6 +134,7 @@ DashApp_ReturnType DashApp_Print(DashApp_ContentType * content)
             appState = DASHAPP_PREWRITE;
         }
         retVal = DASHAPP_OK;
+        xTaskResumeAll(); // End of critical section, interrupts enabled
     }
     return retVal;
 }
@@ -220,6 +233,18 @@ static void DashApp_SendPwrReport(void)
         }
         
     }
+    else 
+    {
+        if(retryCnt > 3u)
+        {
+            appState = DASHAPP_INIT;
+            retryCnt = 0;
+        }
+        else 
+        {
+            retryCnt++;
+        }
+    }
 }
 
 static void DashApp_ReqMfaPage(uint8_t pageId)
@@ -264,6 +289,7 @@ static void DashApp_Write(void)
     uint8_t i = 0;
     if (0u < dspContent.len)
     {
+        vTaskSuspendAll(); // Critical section, interrupts enabled
         msg[0] = DASHAPP_CMD_WRITE;
         msg[1] = dspContent.len + 3; // string length + 3
         msg[2] = (uint8_t)dspContent.ft; // params: font
@@ -273,10 +299,13 @@ static void DashApp_Write(void)
         {
             msg[5+i] = DashApp_FixASCII(dspContent.string[i]);
         }
+        xTaskResumeAll(); // End of critical section, interrupts enabled
         if (VWTP_OK == DASHAPP_SENDTP(msg,sizeof(msg)))
         {
+            vTaskSuspendAll(); // Critical section, interrupts enabled
             waitForAck = 1u;
             appState = DASHAPP_READY;
+            xTaskResumeAll(); // End of critical section, interrupts enabled
         }
     }
     else

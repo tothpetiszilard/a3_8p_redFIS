@@ -2,6 +2,7 @@
 #include "kwp_cfg.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_log.h"
 
 #define KWP_SID_SESSION (0x10u) // Start diagnostic session
 #define KWP_SID_RID     (0x31u) // Start routine by local identifier
@@ -21,7 +22,8 @@ typedef enum
 
 typedef enum
 {
-    KWP_INIT = 0,
+    KWP_CONNECT = 0,
+    KWP_INIT = 1,
     KWP_SESSION = 0x10u,
     KWP_ECUID =   0x1Au,
     KWP_ROUTINE = 0x31u,
@@ -35,6 +37,8 @@ static Kwp_StageType  diagStage = KWP_INIT;
 static TaskHandle_t   KwpTaskHdl = NULL;
 static uint8_t        didBuffer[12u];
 static uint8_t        dataId = 1u;
+static uint8_t        ecuId = 1;
+static uint8_t        retry = 0;
 
 static void Kwp_Cyclic(void *pvParameters);
 static void Kwp_StartSession(uint8_t sessionId);
@@ -42,30 +46,74 @@ static void Kwp_ReadEcuId(uint8_t idOption);
 static void Kwp_StartRoutine(uint8_t rid, uint16_t rEntOpt);
 static void Kwp_ReadData(uint8_t did);
 
-void Kwp_Init(uint8_t ecuId)
+void Kwp_Init(uint8_t ecu)
 {
-    if (KWP_OK == Kwp_ConnectTp(ecuId))
-    {
-        commandStatus = KWP_INPROGRESS;
-        diagStage = KWP_INIT;
-        xTaskCreatePinnedToCore(Kwp_Cyclic, "Kwp2000", 1024, NULL, 5, &KwpTaskHdl,1);
-    }
+    ecuId = ecu;
+    retry = 0;
+    diagStage = KWP_CONNECT;
+    xTaskCreatePinnedToCore(Kwp_Cyclic, "Kwp2000", 2048, NULL, 5, &KwpTaskHdl,1);
 }
 
-Kwp_ReturnType Kwp_GetDataFromECU(uint8_t * dataPtr)
+Kwp_ReturnType Kwp_RequestData(uint8_t did)
 {
     Kwp_ReturnType retVal = KWP_ERR;
+    if ((KWP_READY == diagStage) && (KWP_IDLE == commandStatus))
+    {
+        vTaskSuspendAll(); // Critical section, interrupts enabled
+        dataId = did;
+        diagStage = KWP_READDID;
+        retVal = KWP_OK;
+        xTaskResumeAll(); // End of critical section, interrupts enabled
+    }
+    return retVal;
+}
+
+Kwp_ReturnType Kwp_GetDataFromECU(uint8_t * const dataPtr)
+{
+    Kwp_ReturnType retVal = KWP_ERR;
+    uint8_t tmp;
+    if ((KWP_READY == diagStage) && (KWP_IDLE == commandStatus))
+    {
+        vTaskSuspendAll(); // Critical section, interrupts enabled
+        for(tmp=0;tmp<sizeof(didBuffer);tmp++)
+        {
+            dataPtr[tmp] = didBuffer[tmp]; // copy data
+        }
+        retVal = KWP_OK;
+        xTaskResumeAll(); // End of critical section, interrupts enabled
+    }
     return retVal;
 }
 
 static void Kwp_Cyclic(void *pvParameters)
 {
+    static uint8_t timeout = 0;
     while(1)
     {
+        vTaskDelay(50 / portTICK_PERIOD_MS);
         if (KWP_IDLE == commandStatus)
         {
             switch(diagStage)
             {
+                case KWP_CONNECT:
+                if (KWP_OK == Kwp_ConnectTp(ecuId))
+                {
+                    commandStatus = KWP_INPROGRESS;
+                }
+                else 
+                {
+                    if (retry > 10)
+                    {
+                        retry = 0;
+                        diagStage = KWP_ERROR;
+                    }
+                    else 
+                    {
+                        retry++;
+                        vTaskDelay(500 / portTICK_PERIOD_MS);
+                    }
+                }
+                break;
                 case KWP_INIT:
                 Kwp_StartSession(0x89u);
                 break;
@@ -76,7 +124,9 @@ static void Kwp_Cyclic(void *pvParameters)
                 Kwp_StartRoutine(0xB8u, 0x0000u);
                 break;
                 case KWP_ROUTINE:
-                //case KWP_READDID:
+                diagStage = KWP_READY;
+                break;
+                case KWP_READDID:
                 Kwp_ReadData(dataId);
                 break;
                 case KWP_CLOSE:
@@ -86,7 +136,38 @@ static void Kwp_Cyclic(void *pvParameters)
                 break;
             }
         }
-        vTaskDelay(100 * portTICK_PERIOD_MS);
+        else if (KWP_INPROGRESS == commandStatus)
+        {
+            // Handle ack timeout
+            if (timeout >= 10)
+            {
+                if (KWP_CONNECT == diagStage)
+                {
+                    commandStatus = KWP_IDLE;
+                }
+                timeout=0;
+            }
+            else 
+            {
+                timeout++;
+            }
+        }
+        else if (KWP_WAITRESULT == commandStatus)
+        {
+            if (timeout >= 10)
+            {
+                if (KWP_SESSION == diagStage)
+                {
+                    timeout=0;
+                    commandStatus = KWP_IDLE;
+                    diagStage = KWP_INIT;
+                }
+            }
+            else 
+            {
+                timeout++;
+            }
+        }
     }
 }
 
@@ -95,23 +176,27 @@ void Kwp_Receive(uint8_t * dataPtr,uint16_t len)
     uint8_t i = 0;
     if (KWP_WAITRESULT == commandStatus)
     {
-        if ((0 == dataPtr[0]) && (1u <= dataPtr[1]))
+        if  (1u <= dataPtr[1])
         {
+            vTaskSuspendAll(); // Critical section, interrupts enabled
             if (((KWP_SID_POSRESP + diagStage) == dataPtr[2]))
             {
                 // Positive response
-                if ((KWP_READDID == diagStage) && (dataId == dataPtr[3]) && (sizeof(didBuffer) > (len-4u)))
+                if ((KWP_READDID == diagStage) && (dataId == dataPtr[3u]) && (sizeof(didBuffer) <= (len-4u)))
                 {
-                    for (i=0;i<(len-4u);i++)
+                    
+                    for (i=0;i<(sizeof(didBuffer) );i++)
                     {
                         didBuffer[i] = dataPtr[4u+i];
                     }
+                    diagStage = KWP_READY;
+                    
                 }
                 commandStatus = KWP_IDLE;
             }
-            else if ((KWP_SID_NEGRESP == dataPtr[2])&& (2u < dataPtr[1]))
+            else if ((KWP_SID_NEGRESP == dataPtr[2u])&& (2u < dataPtr[1u]))
             {
-                if ((diagStage == dataPtr[2]) && (KWP_SID_RCRRP == dataPtr[3]))
+                if ((diagStage == dataPtr[3u]) && (KWP_SID_RCRRP == dataPtr[4u]))
                 {
                     // Response pending, stay in KWP_WAITRESULT
                 }
@@ -121,6 +206,7 @@ void Kwp_Receive(uint8_t * dataPtr,uint16_t len)
                     commandStatus = KWP_ERROR;
                 }
             }
+            xTaskResumeAll(); // End of critical section, interrupts enabled
         }
     }
 }
@@ -129,8 +215,9 @@ void Kwp_TxConfirmation(void)
 {
     if (KWP_INPROGRESS == commandStatus)
     {
-        if (KWP_INIT == diagStage)
+        if (KWP_CONNECT == diagStage)
         {
+            diagStage = KWP_INIT;
             commandStatus = KWP_IDLE;
         }
         else
@@ -148,7 +235,7 @@ static void Kwp_StartSession(uint8_t sessionId)
     msg[1] = 0x02; // Length
     msg[2] = KWP_SID_SESSION; // SID
     msg[3] = sessionId;
-    if (KWP_OK == Kwp_SendTp(msg))
+    if (KWP_TP_OK == Kwp_SendTp(msg))
     {
         commandStatus = KWP_INPROGRESS;
         diagStage = KWP_SESSION;
@@ -162,7 +249,7 @@ static void Kwp_ReadEcuId(uint8_t idOption)
     msg[1] = 0x02; // Length
     msg[2] = KWP_SID_RECUID; // SID
     msg[3] = idOption;
-    if (KWP_OK == Kwp_SendTp(msg))
+    if (KWP_TP_OK == Kwp_SendTp(msg))
     {
         commandStatus = KWP_INPROGRESS;
         diagStage = KWP_ECUID;
@@ -178,7 +265,7 @@ static void Kwp_StartRoutine(uint8_t rid, uint16_t rEntOpt)
     msg[3] = rid; // routine local id
     msg[4] = (uint8_t)rEntOpt; // RoutineEntryOption
     msg[5] = (uint8_t)((uint16_t)rEntOpt >> (uint16_t)8u); // RoutineEntryOption
-    if (KWP_OK == Kwp_SendTp(msg))
+    if (KWP_TP_OK == Kwp_SendTp(msg))
     {
         commandStatus = KWP_INPROGRESS;
         diagStage = KWP_ROUTINE;
@@ -192,10 +279,12 @@ static void Kwp_ReadData(uint8_t did)
     msg[1] = 0x02; // Length
     msg[2] = KWP_SID_RDID; // SID
     msg[3] = did; // data local id
-    if (KWP_OK == Kwp_SendTp(msg))
+    if (KWP_TP_OK == Kwp_SendTp(msg))
     {
+        vTaskSuspendAll(); // Critical section, interrupts enabled
         commandStatus = KWP_INPROGRESS;
         diagStage = KWP_READDID;
+        xTaskResumeAll(); // End of critical section, interrupts enabled
     }
 }
 

@@ -14,13 +14,15 @@ void Can_Init(void)
     twai_general_config_t gcfg = TWAI_GENERAL_CONFIG_DEFAULT(GPIO_NUM_26, GPIO_NUM_32, TWAI_MODE_NORMAL);
     twai_timing_config_t tcfg = TWAI_TIMING_CONFIG_500KBITS();
     twai_filter_config_t fcfg;
-    // Accepted IDs are: 35F (stalk buttons), 6c1 (dash), 201 (gw), 300 (engine)
+    gcfg.tx_queue_len = 10;
+    gcfg.intr_flags |= ESP_INTR_FLAG_IRAM;
+    // Accepted IDs are: 35F (stalk buttons), 6c1 (dash), 201 (engine), 300 (engine)
     fcfg.acceptance_code = (0x35Fu << 21u) | (0x200u << 5u);
     fcfg.acceptance_mask = 0x001FB83Fu;
     fcfg.single_filter = false;
     twai_driver_install(&gcfg, &tcfg, &fcfg);
     twai_start();
-    xTaskCreatePinnedToCore(Can_Receive, "CanRx", 2048, NULL, 5, &CanTaskHdl,1);
+    xTaskCreatePinnedToCore(Can_Receive, "CanRx", 2048, NULL, 6, &CanTaskHdl,1);
 }
 
 static void Can_Receive(void *pvParameters)
@@ -63,7 +65,7 @@ Can_ReturnType Can_Write(uint16_t id,uint8_t len,uint8_t * dataPtr)
     {
         msg.data[i] = dataPtr[i];
     }
-    result = twai_transmit(&msg, portTICK_PERIOD_MS);
+    result = twai_transmit(&msg, 5 / portTICK_PERIOD_MS);
     if (ESP_OK == result)
     {
         retVal = CAN_OK;
