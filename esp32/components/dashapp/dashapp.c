@@ -53,7 +53,7 @@ void DashApp_Init(void)
     waitForAck = 0;
     retryCnt = 0;
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    xTaskCreatePinnedToCore(DashApp_Cyclic, "DashApp", 2048, NULL, 5, &DashAppTaskHdl,1);
+    xTaskCreatePinnedToCore(DashApp_Cyclic, "DashApp", 2048, NULL, 4, &DashAppTaskHdl,1);
 }
 
 static void DashApp_Cyclic(void *pvParameters)

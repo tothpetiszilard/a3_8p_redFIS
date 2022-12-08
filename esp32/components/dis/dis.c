@@ -6,7 +6,6 @@
 #include "kwp_cfg.h"
 #include "string.h"
 #include "stalkButtons.h"
-#include "esp_log.h"
 
 typedef enum
 {
@@ -43,7 +42,7 @@ void Dis_Init(void)
     
     vTaskDelay(160 / portTICK_PERIOD_MS);
     
-    xTaskCreatePinnedToCore(Dis_Cyclic, "Dis", 2048u, NULL, 4, &disTaskHandle,1);
+    xTaskCreatePinnedToCore(Dis_Cyclic, "Dis", 2048u, NULL, 2, &disTaskHandle,1);
 }
 
 static void Dis_Cyclic(void *pvParameters)
@@ -83,14 +82,10 @@ static void HandleDisplay(void)
         {
 
             // Create strings from the data
-            if (ENGINEDIAG_OK == EngineDiag_GetChData(pages[actualPage].diagChs[rowCnt], diagBuffer, 1000u))
+            if (ENGINEDIAG_OK == EngineDiag_GetChData(pages[actualPage].diagChs[rowCnt], diagBuffer, 10000u))
             {
                 Dis_CreateStrings(&dspBuffer,&pages[actualPage].data[rowCnt],diagBuffer);
                 dspTask = DIS_DISPLAY_V;
-            }
-            else 
-            {
-                //ESP_LOGI("Dis", "EngineDiag is not ready");
             }
         }
         else
@@ -107,10 +102,6 @@ static void HandleDisplay(void)
             {
                 rowCnt++;
                 dspTask = DIS_PROCESS;
-            }
-            else 
-            {
-                //ESP_LOGI("Dis", "DashApp is not ready");
             }
         }
         else

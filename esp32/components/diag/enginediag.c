@@ -68,7 +68,7 @@ void EngineDiag_Init(void)
     vTaskDelay(210u / portTICK_PERIOD_MS);
     Kwp_Init(0x01u);
     state = ENGINEDIAG_IDLE;
-    xTaskCreatePinnedToCore(EngineDiag_Cyclic, "EngineDiag", 2048u, NULL, 4, &taskHandle,1);
+    xTaskCreatePinnedToCore(EngineDiag_Cyclic, "EngineDiag", 2048u, NULL, 3, &taskHandle,1);
 }
 
 EngineDiag_ReturnType EngineDiag_GetChData(const EngineDiag_ChannelIdType ch, uint8_t * dataPtr, uint32_t timeout)

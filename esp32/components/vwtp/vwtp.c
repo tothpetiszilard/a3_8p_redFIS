@@ -137,9 +137,10 @@ VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len)
     if (chId < (sizeof(vwtp_channels)/sizeof(vwtp_channels[0])))
     {
         chPtr = &vwtp_channels[chId];
+        vTaskSuspendAll(); // Critical section, interrupts enabled
         if (chPtr->txState == VWTP_IDLE)
         {
-            vTaskSuspendAll(); // Critical section, interrupts enabled
+            
             chPtr->txSize = len;
             chPtr->txOffset = 0u;
             for (i=0; i<len; i++)
@@ -147,7 +148,6 @@ VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len)
                 chPtr->txBuffer[i] = buffer[i];
             }
             chPtr->txState = VWTP_WAIT;
-            xTaskResumeAll(); // End of critical section, interrupts enabled
             retVal = VWTP_OK;
         }
         else if ((chPtr->txState == VWTP_CONNECT) && (chPtr->cfg.mode != VWTP_DIAG ))
@@ -160,6 +160,7 @@ VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len)
         {
             // Do nothing, return error
         }
+        xTaskResumeAll(); // End of critical section, interrupts enabled
     }
     return retVal;
 }

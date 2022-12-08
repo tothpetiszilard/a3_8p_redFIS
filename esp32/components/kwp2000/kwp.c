@@ -51,7 +51,7 @@ void Kwp_Init(uint8_t ecu)
     ecuId = ecu;
     retry = 0;
     diagStage = KWP_CONNECT;
-    xTaskCreatePinnedToCore(Kwp_Cyclic, "Kwp2000", 2048, NULL, 5, &KwpTaskHdl,1);
+    xTaskCreatePinnedToCore(Kwp_Cyclic, "Kwp2000", 2048, NULL, 4, &KwpTaskHdl,1);
 }
 
 Kwp_ReturnType Kwp_RequestData(uint8_t did)
