@@ -89,7 +89,7 @@ static void Kwp_Cyclic(void *pvParameters)
     static uint8_t timeout = 0;
     while(1)
     {
-        vTaskDelay(50 / portTICK_PERIOD_MS);
+        vTaskDelay(50u / portTICK_PERIOD_MS);
         if (KWP_IDLE == commandStatus)
         {
             switch(diagStage)
@@ -101,7 +101,7 @@ static void Kwp_Cyclic(void *pvParameters)
                 }
                 else 
                 {
-                    if (retry > 10)
+                    if (retry > 10u)
                     {
                         retry = 0;
                         diagStage = KWP_ERROR;
@@ -109,7 +109,7 @@ static void Kwp_Cyclic(void *pvParameters)
                     else 
                     {
                         retry++;
-                        vTaskDelay(500 / portTICK_PERIOD_MS);
+                        vTaskDelay(500u / portTICK_PERIOD_MS);
                     }
                 }
                 break;
@@ -130,21 +130,30 @@ static void Kwp_Cyclic(void *pvParameters)
                 break;
                 case KWP_CLOSE:
                 Kwp_DisconnectTp();
-                vTaskDelete(KwpTaskHdl);
+                vTaskDelay(1000u / portTICK_PERIOD_MS);
+                retry = 0;
+                diagStage = KWP_CONNECT;
+                break;
                 default:
                 break;
             }
         }
         else if (KWP_INPROGRESS == commandStatus)
         {
-            // Handle ack timeout
-            if (timeout >= 10)
+            if (KWP_TIMEOUT_1SEC <= timeout)
             {
                 if (KWP_CONNECT == diagStage)
                 {
+                    // Handle no response to connect timeout
                     commandStatus = KWP_IDLE;
                 }
-                timeout=0;
+                else
+                {
+                    // No response from ECU
+                    diagStage = KWP_CLOSE;
+                    commandStatus = KWP_IDLE;
+                }
+                timeout=0u;
             }
             else 
             {
@@ -153,14 +162,12 @@ static void Kwp_Cyclic(void *pvParameters)
         }
         else if (KWP_WAITRESULT == commandStatus)
         {
-            if (timeout >= 10)
+            if (KWP_TIMEOUT_5SECS <= timeout)
             {
-                if (KWP_SESSION == diagStage)
-                {
-                    timeout=0;
-                    commandStatus = KWP_IDLE;
-                    diagStage = KWP_INIT;
-                }
+                // (Rx) timeout occured while waiting for response
+                timeout=0;
+                diagStage = KWP_CLOSE;
+                commandStatus = KWP_IDLE;
             }
             else 
             {
@@ -207,7 +214,9 @@ void Kwp_Receive(uint8_t * dataPtr,uint16_t len)
             }
             else 
             {
-                // ??
+                // Corrupt TP frame or unexpected response
+                diagStage = KWP_CLOSE;
+                commandStatus = KWP_IDLE;
             }
             xTaskResumeAll(); // End of critical section, interrupts enabled
         }
