@@ -2,7 +2,6 @@
 #include "kwp_cfg.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_log.h"
 
 #define KWP_SID_SESSION (0x10u) // Start diagnostic session
 #define KWP_SID_RID     (0x31u) // Start routine by local identifier
@@ -206,14 +205,18 @@ void Kwp_Receive(uint8_t * dataPtr,uint16_t len)
                     commandStatus = KWP_ERROR;
                 }
             }
+            else 
+            {
+                // ??
+            }
             xTaskResumeAll(); // End of critical section, interrupts enabled
         }
     }
 }
 
-void Kwp_TxConfirmation(void)
+void Kwp_TxConfirmation(uint8_t result)
 {
-    if (KWP_INPROGRESS == commandStatus)
+    if ((KWP_TP_ERR != result) && (KWP_INPROGRESS == commandStatus))
     {
         if (KWP_CONNECT == diagStage)
         {
@@ -224,6 +227,16 @@ void Kwp_TxConfirmation(void)
         {
             commandStatus = KWP_WAITRESULT;
         }
+    }
+    else if (KWP_TP_ERR == result)
+    {
+        commandStatus = KWP_IDLE;
+        retry = 0;
+        diagStage = KWP_CONNECT;
+    }
+    else 
+    {
+        // Nothing to do
     }
 }
 

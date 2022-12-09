@@ -53,7 +53,7 @@ void DashApp_Init(void)
     waitForAck = 0;
     retryCnt = 0;
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    xTaskCreatePinnedToCore(DashApp_Cyclic, "DashApp", 2048, NULL, 4, &DashAppTaskHdl,1);
+    xTaskCreatePinnedToCore(DashApp_Cyclic, "DashApp", 2560u, NULL, 4, &DashAppTaskHdl,1);
 }
 
 static void DashApp_Cyclic(void *pvParameters)
@@ -139,9 +139,20 @@ DashApp_ReturnType DashApp_Print(const DashApp_ContentType * const content)
     return retVal;
 }
 
-void DashApp_TxConfirmation(void)
+void DashApp_TxConfirmation(uint8_t result)
 {
-    waitForAck = 0;
+    if (VWTP_OK == result)
+    {
+        waitForAck = 0;
+    }
+    else if (VWTP_ERR == result)
+    {
+        appState = DASHAPP_INIT;
+    }
+    else 
+    {
+        // Nothing to do
+    }
 }
 
 void DashApp_Receive(uint8_t * dataPtr,uint16_t len)

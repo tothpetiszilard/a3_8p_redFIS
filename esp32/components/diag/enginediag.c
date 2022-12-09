@@ -2,6 +2,7 @@
 #include "kwp.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_log.h"
 
 typedef enum
 {
@@ -151,7 +152,7 @@ static void EngineDiag_Cyclic(void *pvParameters)
 
 static void EngineDiag_HandleDid(uint8_t * buffer)
 {
-    uint32_t timestamp;
+    uint32_t timestamp = 0u;
     uint8_t ch,offset,b; 
     for (ch = 0;ch<ENGINEDIAG_CH_MAX;ch++)
     {
@@ -164,13 +165,13 @@ static void EngineDiag_HandleDid(uint8_t * buffer)
                 // Search for a matching MBW from all the 4 MWBs we received
                 if (offset == ChIdxToDidOffset[ch])
                 {
+                    timestamp = xTaskGetTickCount();
                     vTaskSuspendAll(); // Critical section, interrupts enabled
                     for (b=0; b < 3u; b++)
                     {
                         // Copy 3 bytes of data from buffer with offset
                         channels[ch].data[b] = buffer[(offset * 3u)+b];
                     }
-                    timestamp = xTaskGetTickCount();
                     channels[ch].timestamp = timestamp;
                     xTaskResumeAll(); // End of critical section, interrupts enabled
                 }

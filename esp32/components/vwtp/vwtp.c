@@ -4,6 +4,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#ifdef VWTP_DET
+#include "esp_log.h"
+#endif
+
 static TaskHandle_t VwTpTaskHdl = NULL;
 
 static void VwTp_HandleTx(VwTp_ChannelType * const chPtr);
@@ -24,9 +28,10 @@ void VwTp_Init(void)
     {
         vwtp_channels[i].txState = VWTP_CONNECT;
         vwtp_channels[i].rxState = VWTP_CONNECT;
-
+        vwtp_channels[i].seqCntRx = 0xFu; // 0 is expected in the first frame
     }
-    xTaskCreatePinnedToCore(VwTp_Cyclic, "VwTp", 2048, NULL, 5, &VwTpTaskHdl,1);
+    xTaskCreatePinnedToCore(VwTp_Cyclic, "VwTp", 2048u, NULL, 5, &VwTpTaskHdl,1);
+    //TODO: 0x9, ACK, not ready for next packet: should be handled better
 }
 
 VwTp_ReturnType VwTp_Connect(uint8_t ecuId)
@@ -87,7 +92,11 @@ static void VwTp_HandleTxTimeout(VwTp_ChannelType * const chPtr)
         if (chPtr->txTimeout >= ackCfg)
         {
             // timeout, resend
+            #ifdef VWTP_DET
+            ESP_LOGI("VWTP","Timeout, resend: id: %x , seq: %x",chPtr->cfg.txId,chPtr->seqCntTx);
+            #endif
             chPtr->txOffset = 0;
+            chPtr->seqCntTx = chPtr->ackSeqCntTx; // set back the seq cntr
             if (chPtr->txSize > 0)
             {
                 chPtr->txState = VWTP_WAIT;
@@ -140,7 +149,6 @@ VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len)
         vTaskSuspendAll(); // Critical section, interrupts enabled
         if (chPtr->txState == VWTP_IDLE)
         {
-            
             chPtr->txSize = len;
             chPtr->txOffset = 0u;
             for (i=0; i<len; i++)
@@ -235,58 +243,135 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
     else if (0x10u == (dataPtr[0] & 0xF0u))
     {
         vTaskSuspendAll(); // Critical section, interrupts enabled
-        chPtr->seqCntRx = (dataPtr[0] & 0xF);
-        //last frame or single frame
-        if (chPtr->rxState == VWTP_IDLE)
+        if ((dataPtr[0] & 0x0Fu) == ((chPtr->seqCntRx + 1u) & 0x0Fu))
         {
-            //single frame received
-            chPtr->rxSize = (dlc-1);
-            for(i=0;i<chPtr->rxSize;i++)
+            // seq cnt OK
+            chPtr->seqCntRx = (dataPtr[0] & 0xF);
+            //last frame or single frame
+            if (VWTP_IDLE == chPtr->rxState)
             {
-                chPtr->rxBuffer[i] = dataPtr[i+1];
+                //single frame received
+                chPtr->rxSize = (dlc-1);
+                for(i=0;i<chPtr->rxSize;i++)
+                {
+                    chPtr->rxBuffer[i] = dataPtr[i+1];
+                }
+                chPtr->txFlags.ack = 1u; // Ack + rxIndication
+            }
+            else if (VWTP_WAIT == chPtr->rxState )
+            {
+                // last frame received
+                for(i=0;i<(dlc-1);i++)
+                {
+                    chPtr->rxBuffer[chPtr->rxSize + i] = dataPtr[i+1];
+                }
+                chPtr->rxSize += (dlc-1);
+                chPtr->txFlags.ack = 1u; // Ack + rxIndication
+            }
+            else 
+            {
+                // received single/last data frame while not expected
+                #ifdef VWTP_DET
+                ESP_LOGE("VWTP","Not expected s/l data frame, id %x, seq %x", chPtr->cfg.rxId, dataPtr[0]);
+                #endif
+                VwTp_sendClose(chPtr);
             }
         }
-        else
+        else 
         {
-            // last frame received
-            for(i=0;i<(dlc-1);i++)
+            // Wrong sequence number received
+            // ESP_LOGE("VWTP","sl wrong seq num");
+            if (VWTP_IDLE == chPtr->rxState)
             {
-                chPtr->rxBuffer[chPtr->rxSize + i] = dataPtr[i+1];
+                chPtr->seqCntRx = ((dataPtr[0]-1u) & 0x0Fu); // resync
             }
-            chPtr->rxSize += (dlc-1);
         }
-        chPtr->txFlags.ack = 1u; // Ack + rxIndication
         xTaskResumeAll(); // End of critical section, interrupts enabled
     }
     else if ((0x20u == (dataPtr[0] & 0xF0u)) || (0u == (dataPtr[0] & 0xF0u)))
     {
-        vTaskSuspendAll(); // Critical section, interrupts enabled
-        chPtr->seqCntRx = (dataPtr[0] & 0x0Fu);
-        chPtr->rxState = VWTP_WAIT; // more data expected
-        for(i=0;i<(dlc-1);i++)
+        if ((VWTP_IDLE == chPtr->rxState) || (VWTP_WAIT == chPtr->rxState ))
         {
-            chPtr->rxBuffer[chPtr->rxSize + i] = dataPtr[i+1];
+            vTaskSuspendAll(); // Critical section, interrupts enabled
+            if ((dataPtr[0] & 0x0Fu) == ((chPtr->seqCntRx + 1u) & 0x0Fu))
+            {
+                chPtr->seqCntRx = (dataPtr[0] & 0x0Fu);
+                chPtr->rxState = VWTP_WAIT; // more data expected
+                for(i=0;i<(dlc-1);i++)
+                {
+                    chPtr->rxBuffer[chPtr->rxSize + i] = dataPtr[i+1];
+                }
+                chPtr->rxSize += (dlc-1);
+                if (0 == (dataPtr[0] & 0xF0u))
+                {
+                    chPtr->txFlags.ack = 1u; // Ack + rxIndication
+                }
+            }
+            else 
+            {
+                // Wrong sequence number received
+                #ifdef VWTP_DET
+                ESP_LOGE("VWTP","fc wrong seq num");
+                #endif
+            }
+            xTaskResumeAll(); // End of critical section, interrupts enabled
         }
-        chPtr->rxSize += (dlc-1);
-        if (0 == (dataPtr[0] & 0xF0u))
+        else 
         {
-            chPtr->txFlags.ack = 1u; // Ack + rxIndication
+            //Not expected first or consecutive data frame received
+            #ifdef VWTP_DET
+            ESP_LOGE("VWTP","Not expected f/c data frame, id %x, seq %x", chPtr->cfg.rxId, dataPtr[0]);
+            #endif
+            VwTp_sendClose(chPtr);
         }
-        xTaskResumeAll(); // End of critical section, interrupts enabled
     }
-    else if (0xB0u == (dataPtr[0] & 0xF0u))
+    else if ((0xB0u == (dataPtr[0] & 0xF0u)) || (0x90u == (dataPtr[0] & 0xF0u)))
     {
         vTaskSuspendAll(); // Critical section, interrupts enabled
-        chPtr->seqCntTx = (dataPtr[0] & 0x0Fu);
-        chPtr->txSize = 0;
-        chPtr->txOffset = 0;
-        chPtr->txState = VWTP_FINISHED; // txConfirmation
+        if (VWTP_ACK == chPtr->txState)
+        {
+            chPtr->seqCntTx = (dataPtr[0] & 0x0Fu);
+            chPtr->ackSeqCntTx = (dataPtr[0] & 0x0Fu);
+            chPtr->txSize = 0;
+            chPtr->txOffset = 0;
+            chPtr->txState = VWTP_FINISHED; // txConfirmation
+        }
+        else 
+        {
+            //received ack when not expected
+            #ifdef VWTP_DET
+            ESP_LOGE("VWTP","Not expected ACK");
+            #endif
+        }
         xTaskResumeAll(); // End of critical section, interrupts enabled
     }
     else if (0xA8u == dataPtr[0])
     {
         // Connection was terminated
         VwTp_sendClose(chPtr);
+    }
+    else if (0xA4u == dataPtr[0])
+    {
+        // Break
+        #ifdef VWTP_DET
+        ESP_LOGI("VWTP","Break");
+        #endif
+        if ((VWTP_WAIT == chPtr->txState) || (VWTP_ACK == chPtr->txState))
+        {
+            // Resend
+            #ifdef VWTP_DET
+            ESP_LOGI("VWTP","Resend");
+            #endif
+            chPtr->txOffset = 0;
+            if (chPtr->txSize > 0)
+            {
+                chPtr->txState = VWTP_WAIT;
+            }
+            else
+            {
+                chPtr->txState = VWTP_IDLE;
+            }
+        }
     }
     else
     {
@@ -299,15 +384,7 @@ static void VwTp_sendAck(VwTp_ChannelType * const chPtr)
 {
     uint8_t msg[1];
     uint8_t ackSeq;
-    
-    if (chPtr->seqCntRx < 0x0Fu)
-    {
-        ackSeq = chPtr->seqCntRx+1;
-    }
-    else
-    {
-        ackSeq = 0;
-    }
+    ackSeq = (chPtr->seqCntRx+1) & 0x0Fu;
     msg[0] = 0xB0u | ackSeq; // ack
     if (CAN_OK == VWTP_SENDMESSAGE(chPtr->cfg.txId,sizeof(msg),msg))
     {
@@ -325,7 +402,7 @@ static void VwTp_sendClose(VwTp_ChannelType * const chPtr)
     
     vTaskSuspendAll(); // Critical section, interrupts enabled
     chPtr->seqCntTx = 0;
-    chPtr->seqCntRx = 0;
+    chPtr->seqCntRx = 0xFu;
     chPtr->rxSize = 0;
     chPtr->txSize = 0;
     chPtr->rxState = VWTP_IDLE;
@@ -341,6 +418,10 @@ static void VwTp_sendClose(VwTp_ChannelType * const chPtr)
         chPtr->cfg.txId = 0x200u;
         chPtr->cfg.rxId = 0;
         xTaskResumeAll(); // End of critical section, interrupts enabled
+    }
+    if (NULL != chPtr->cfg.txConfirmation)
+    {
+        chPtr->cfg.txConfirmation(VWTP_ERR);
     }
 }
 
@@ -381,7 +462,7 @@ static void VwTp_HandleCallbacks(VwTp_ChannelType * const chPtr)
     {
         if (NULL != chPtr->cfg.txConfirmation)
         {
-            chPtr->cfg.txConfirmation();
+            chPtr->cfg.txConfirmation(VWTP_OK);
         }
         chPtr->txState = VWTP_IDLE;
     }
@@ -392,7 +473,6 @@ static void VwTp_HandleTx(VwTp_ChannelType * const chPtr)
     uint16_t tmp;
     uint8_t dlc;
     uint8_t msg[8];
-    
     if ( VWTP_WAIT == chPtr->txState )
     {
         if ((chPtr->txSize < 8u) || (((chPtr->txSize)-(chPtr->txOffset)) < 8u))

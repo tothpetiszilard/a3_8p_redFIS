@@ -35,7 +35,7 @@ extern void DashApp_Init(void);
 extern DashApp_ReturnType DashApp_Print(const DashApp_ContentType * const content);
 
 extern void DashApp_Receive(uint8_t * dataPtr,uint16_t len);
-extern void DashApp_TxConfirmation(void);
+extern void DashApp_TxConfirmation(uint8_t result);
 
 #endif //DASHAPP_H_
 

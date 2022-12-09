@@ -43,12 +43,13 @@ typedef struct
     uint8_t ips; // inter-packet-space, time between two TP frames
     VwTp_ModeType mode;
     void (*rxIndication)(uint8_t *data,uint16_t len); //callback: Data rx
-    void (*txConfirmation)(void); //callback: Data sent
+    void (*txConfirmation)(uint8_t result); //callback: Data sent
 }VwTp_ChannelCfgType;
 
 typedef struct
 {
     uint8_t seqCntTx;
+    uint8_t ackSeqCntTx;
     uint8_t seqCntRx;
     uint8_t rxBuffer[VWTP_RXBUFFERSIZE];
     uint8_t txBuffer[VWTP_TXBUFFERSIZE];
