@@ -32,6 +32,7 @@ typedef struct
 {
     uint8_t ack : 1;
     uint8_t params :2; // 2 = req, 3 = resp
+    uint8_t brk :1;
 } VwTp_TxTasks;
 
 typedef struct 
@@ -49,11 +50,13 @@ typedef struct
 typedef struct
 {
     uint8_t seqCntTx;
-    uint8_t ackSeqCntTx;
+    uint8_t ackSeqCntTx; // last acknowledged tx seq cnt
     uint8_t seqCntRx;
+    uint8_t ackSeqCntRx; // last acknowledged rx seq cnt
     uint8_t rxBuffer[VWTP_RXBUFFERSIZE];
     uint8_t txBuffer[VWTP_TXBUFFERSIZE];
     uint8_t txTimeout;
+    uint8_t rxTimeout;
     uint16_t rxSize;
     uint16_t txSize;
     uint16_t txOffset;

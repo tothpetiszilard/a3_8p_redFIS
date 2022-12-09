@@ -11,13 +11,16 @@
 static TaskHandle_t VwTpTaskHdl = NULL;
 
 static void VwTp_HandleTx(VwTp_ChannelType * const chPtr);
+static void VwTp_HandleTxTimeout(VwTp_ChannelType * const chPtr);
 static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr);
+static void VwTp_HandleRxTimeout(VwTp_ChannelType * const chPtr);
 static void VwTp_HandleConnect(VwTp_ChannelType * chPtr,uint8_t * dataPtr);
 static void VwTp_HandleCallbacks(VwTp_ChannelType * const chPtr);
 static void VwTp_sendTpParams(VwTp_ChannelType * const chPtr, uint8_t response);
 static void VwTp_sendClose(VwTp_ChannelType * const chPtr);
 static void VwTp_sendAck(VwTp_ChannelType * const chPtr);
-static void VwTp_HandleTxTimeout(VwTp_ChannelType * const chPtr);
+static void VwTp_sendBreak(VwTp_ChannelType * const chPtr);
+
 
 static void VwTp_Cyclic(void *pvParameters);
 
@@ -95,10 +98,11 @@ static void VwTp_HandleTxTimeout(VwTp_ChannelType * const chPtr)
             #ifdef VWTP_DET
             ESP_LOGI("VWTP","Timeout, resend: id: %x , seq: %x",chPtr->cfg.txId,chPtr->seqCntTx);
             #endif
+            vTaskSuspendAll(); // Critical section, interrupts enabled
             chPtr->txOffset = 0;
-            chPtr->seqCntTx = chPtr->ackSeqCntTx; // set back the seq cntr
             if (chPtr->txSize > 0)
             {
+                chPtr->seqCntTx = chPtr->ackSeqCntTx; // set back the seq cntr
                 chPtr->txState = VWTP_WAIT;
             }
             else
@@ -106,6 +110,7 @@ static void VwTp_HandleTxTimeout(VwTp_ChannelType * const chPtr)
                 chPtr->txState = VWTP_IDLE;
             }
             chPtr->txTimeout = 0;
+            xTaskResumeAll(); // End of critical section, interrupts enabled
             
         }
         else
@@ -133,6 +138,7 @@ static void VwTp_Cyclic(void *pvParameters)
             VwTp_HandleTxTimeout(chPtr);
             VwTp_HandleTx(chPtr); // TODO: Requesting ACK after x transmitted frames 
             VwTp_HandleCallbacks(chPtr);
+            VwTp_HandleRxTimeout(chPtr);
             vTaskDelay((10u/(sizeof(vwtp_channels)/sizeof(vwtp_channels[0]))) / portTICK_PERIOD_MS);
         }
     }
@@ -198,6 +204,29 @@ void VwTp_Receive(uint16_t canId, uint8_t dlc, uint8_t * dataPtr)
     }
 }
 
+static void VwTp_HandleRxTimeout(VwTp_ChannelType * const chPtr)
+{
+    if (VWTP_WAIT == chPtr->rxState)
+    {
+        if(20u <= chPtr->rxTimeout)
+        {
+            // Send break?
+            chPtr->txFlags.brk = 1u;
+            chPtr->rxState = VWTP_IDLE;
+            chPtr->seqCntRx = chPtr->ackSeqCntRx;
+            chPtr->rxTimeout = 0u;
+        }
+        else 
+        {
+            chPtr->rxTimeout++;
+        }
+    }
+    else 
+    {
+        chPtr->rxTimeout = 0u;
+    }
+}
+
 void VwTp_Disconnect(uint8_t chId)
 {
     VwTp_ChannelType * chPtr = NULL;
@@ -257,6 +286,7 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
                     chPtr->rxBuffer[i] = dataPtr[i+1];
                 }
                 chPtr->txFlags.ack = 1u; // Ack + rxIndication
+                chPtr->rxState = VWTP_ACK;
             }
             else if (VWTP_WAIT == chPtr->rxState )
             {
@@ -267,6 +297,7 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
                 }
                 chPtr->rxSize += (dlc-1);
                 chPtr->txFlags.ack = 1u; // Ack + rxIndication
+                chPtr->rxState = VWTP_ACK;
             }
             else 
             {
@@ -362,15 +393,18 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
             #ifdef VWTP_DET
             ESP_LOGI("VWTP","Resend");
             #endif
+            vTaskSuspendAll(); // Critical section, interrupts enabled
             chPtr->txOffset = 0;
             if (chPtr->txSize > 0)
             {
+                chPtr->seqCntTx = chPtr->ackSeqCntTx;
                 chPtr->txState = VWTP_WAIT;
             }
             else
             {
                 chPtr->txState = VWTP_IDLE;
             }
+            xTaskResumeAll(); // End of critical section, interrupts enabled
         }
     }
     else
@@ -389,6 +423,7 @@ static void VwTp_sendAck(VwTp_ChannelType * const chPtr)
     if (CAN_OK == VWTP_SENDMESSAGE(chPtr->cfg.txId,sizeof(msg),msg))
     {
         vTaskSuspendAll(); // Critical section, interrupts enabled
+        chPtr->ackSeqCntRx = chPtr->seqCntRx;
         chPtr->txFlags.ack = 0u;
         // reset states to receive the next msg
         chPtr->rxState = VWTP_FINISHED;
@@ -441,6 +476,17 @@ static void VwTp_sendTpParams(VwTp_ChannelType * const chPtr, uint8_t response)
         {
             chPtr->txFlags.params = 0;
         }
+    }
+}
+
+static void VwTp_sendBreak(VwTp_ChannelType * const chPtr)
+{
+    uint8_t msg[1];
+    
+    msg[0] = 0xA4u; // Break
+    if (CAN_OK == VWTP_SENDMESSAGE(chPtr->cfg.txId,sizeof(msg),msg))
+    {
+        chPtr->txFlags.brk = 0;
     }
 }
 
@@ -524,6 +570,10 @@ static void VwTp_HandleTx(VwTp_ChannelType * const chPtr)
     else if ((VWTP_IDLE == chPtr->txState) && (0 != chPtr->txFlags.ack))
     {
         VwTp_sendAck(chPtr);
+    }
+    else if ((VWTP_IDLE == chPtr->txState) && (0 != chPtr->txFlags.brk))
+    {
+        VwTp_sendBreak(chPtr);
     }
     else if (((VWTP_IDLE == chPtr->txState) || (VWTP_CONNECT == chPtr->txState)) && (0 != chPtr->txFlags.params))
     {
