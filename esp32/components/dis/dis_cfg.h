@@ -7,21 +7,21 @@
 
 typedef struct
 {
-    const uint8_t rows_used;
-    const DashApp_ContentType * const labels;
-    const DashApp_ContentType * const data;
-    const EngineDiag_ChannelIdType * const diagChs;
-}DisPageType;
+    EngineDiag_ChannelIdType diagCh;
+    uint16_t timeout;
+} DiagIdType;
 
 typedef struct
 {
-    uint8_t didBuffer[12u];
-    uint8_t dataId;
-} DiagIdType;
+    const uint8_t rows_used;
+    const DashApp_ContentType * const labels;
+    const DashApp_ContentType * const data;
+    const DiagIdType * const diagChs;
+}DisPageType;
 
 extern const DashApp_ContentType pageLabels[1][3];
 extern const DashApp_ContentType pageData[1][3];
-extern const EngineDiag_ChannelIdType pageDiag[1][3];
+extern const DiagIdType pageDiag[1][3];
 
 extern uint8_t Dis_DecodeFrame(char *p, uint8_t *frameData);
 

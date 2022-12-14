@@ -31,7 +31,6 @@ static char DashApp_FixASCII(char c);
 
 static DashApp_ContentType dspContent;
 
-static void DashApp_Cyclic(void *pvParameters);
 // Rx
 static void DashApp_HandlePwrState(uint8_t val);
 static void DashApp_HandleDashID(uint8_t * data);
@@ -52,14 +51,18 @@ void DashApp_Init(void)
     appState = DASHAPP_INIT;
     waitForAck = 0;
     retryCnt = 0;
+    #ifndef REDFIS_SINGLE_THREAD
     vTaskDelay(100 / portTICK_PERIOD_MS);
     xTaskCreatePinnedToCore(DashApp_Cyclic, "DashApp", 2560u, NULL, 4, &DashAppTaskHdl,1);
+    #endif
 }
 
-static void DashApp_Cyclic(void *pvParameters)
+void DashApp_Cyclic(void *pvParameters)
 {
     static uint8_t initTimeout = 0;
-    while(1u)
+    #ifndef REDFIS_SINGLE_THREAD
+    while(1)
+    #endif
     {
         if (0 == waitForAck)
         {
@@ -104,7 +107,9 @@ static void DashApp_Cyclic(void *pvParameters)
                 break;
             }
         }
+        #ifndef REDFIS_SINGLE_THREAD
         vTaskDelay(30 / portTICK_PERIOD_MS);
+        #endif
     }
 }
 
@@ -232,7 +237,9 @@ static void DashApp_SendPwrReport(void)
         {
             if (DASHAPP_SHUTDOWN == appState)
             {
+                #ifndef REDFIS_SINGLE_THREAD
                 xTaskCreatePinnedToCore(DashApp_Cyclic, "DashApp", 2048, NULL, 5, &DashAppTaskHdl,1);
+                #endif
             }
             appState = DASHAPP_IDREQ;
         }

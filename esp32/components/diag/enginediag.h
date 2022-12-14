@@ -31,6 +31,7 @@ typedef uint8_t EngineDiag_ReturnType;
 
 
 extern void EngineDiag_Init(void);
+extern void EngineDiag_Cyclic(void *pvParameters);
 extern EngineDiag_ReturnType EngineDiag_GetChData(const EngineDiag_ChannelIdType ch, uint8_t * dataPtr, uint32_t timeout);
 
 #endif //ENGINE_DIAG_H_

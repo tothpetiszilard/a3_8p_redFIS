@@ -6,7 +6,6 @@
 #include "canWrapper.h"
 #include "canWrapper_Cfg.h"
 
-static void Can_Receive(void *pvParameters);
 static TaskHandle_t CanTaskHdl = NULL;
 
 void Can_Init(void)
@@ -22,16 +21,24 @@ void Can_Init(void)
     fcfg.single_filter = false;
     twai_driver_install(&gcfg, &tcfg, &fcfg);
     twai_start();
+    #ifndef REDFIS_SINGLE_THREAD
     xTaskCreatePinnedToCore(Can_Receive, "CanRx", 2048, NULL, 6, &CanTaskHdl,1);
+    #endif
 }
 
-static void Can_Receive(void *pvParameters)
+void Can_Receive(void *pvParameters)
 {
     twai_message_t msg;
     esp_err_t result;
+    #ifndef REDFIS_SINGLE_THREAD
     while(1)
+    #endif
     {
+        #ifndef REDFIS_SINGLE_THREAD
         result = twai_receive(&msg, portMAX_DELAY);
+        #else
+        result = twai_receive(&msg, 0u);
+        #endif
         if(result == ESP_OK)
         {
             // CAN frame received

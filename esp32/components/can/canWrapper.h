@@ -9,6 +9,7 @@
 typedef uint8_t Can_ReturnType;
 
 extern void Can_Init(void);
+extern void Can_Receive(void *pvParameters);
 extern void Can_DeInit(void);
 extern Can_ReturnType Can_Write(uint16_t id,uint8_t len,uint8_t * dataPtr);
 

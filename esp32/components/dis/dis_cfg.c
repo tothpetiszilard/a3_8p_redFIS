@@ -1,16 +1,26 @@
 #include "dis_cfg.h"
 #include "dashapp.h"
 
-const EngineDiag_ChannelIdType pageDiag[1][3] = 
+const DiagIdType pageDiag[1][3] = 
 {
     // Page0
     {
         // Row 0
-        ENGINEDIAG_CH_IATTEMP7, // did 7
+        {
+            .diagCh = ENGINEDIAG_CH_IATTEMP7, // did 7
+            .timeout = 2000
+        },
         // Row 1
-        ENGINEDIAG_CH_OILTEMP, // did 29
+        {
+            .diagCh = ENGINEDIAG_CH_OILTEMP, // did 29
+            .timeout = 10000
+        },
         // Row 2
-        ENGINEDIAG_CH_FUELTEMP // did7
+        {
+            .diagCh = ENGINEDIAG_CH_FUELTEMP, // did7
+            .timeout = 10000
+        }
+        
     }
 };
 
