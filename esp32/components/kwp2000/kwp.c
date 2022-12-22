@@ -90,6 +90,7 @@ static void Kwp_Cyclic(void *pvParameters)
     while(1)
     {
         vTaskDelay(50u / portTICK_PERIOD_MS);
+        timeout=0u;
         if (KWP_IDLE == commandStatus)
         {
             switch(diagStage)
