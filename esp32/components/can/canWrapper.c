@@ -14,6 +14,7 @@ void Can_Init(void)
     twai_timing_config_t tcfg = TWAI_TIMING_CONFIG_500KBITS();
     twai_filter_config_t fcfg;
     gcfg.tx_queue_len = 10;
+    gcfg.rx_queue_len = 15;
     gcfg.intr_flags |= ESP_INTR_FLAG_IRAM;
     // Accepted IDs are: 35F (stalk buttons), 6c1 (dash), 201 (engine), 300 (engine)
     fcfg.acceptance_code = (0x35Fu << 21u) | (0x200u << 5u);
