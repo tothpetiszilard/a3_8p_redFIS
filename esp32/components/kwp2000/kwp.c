@@ -97,6 +97,7 @@ void Kwp_Cyclic(void *pvParameters)
         #endif
         if (KWP_IDLE == commandStatus)
         {
+            timeout=0;
             switch(diagStage)
             {
                 case KWP_CONNECT:
