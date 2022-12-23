@@ -57,7 +57,7 @@ Can_ReturnType Can_Write(uint16_t id,uint8_t len,uint8_t * dataPtr)
     msg.data_length_code = len;
     msg.rtr = 0;
     msg.extd = 0;
-    msg.ss = 1;
+    msg.ss = 0;
     msg.self = 0;
     msg.dlc_non_comp = 0;
     msg.reserved = 0;
