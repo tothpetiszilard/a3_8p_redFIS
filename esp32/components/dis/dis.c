@@ -32,6 +32,7 @@ static void HandleDisplay(DisPageType * pagePtr);
 static DisDspTaskType dspTask = DIS_DISPLAY_C;
 static StalkButtons_Type buttons = STALKBUTTONS_NOEVENT;
 static uint8_t actualPage = 0;
+static uint8_t actualRow = 0;
 static DashApp_ContentType dspBuffer;
 static uint8_t diagBuffer[3u];
 
@@ -56,10 +57,12 @@ void Dis_Cyclic(void *pvParameters)
         if ((STALKBUTTONS_UP == buttons) && ((sizeof(pages)/sizeof(pages[0]) > actualPage)))
         {
             actualPage++;
+            actualRow = 0;
         }
         else if ((STALKBUTTONS_DOWN == buttons) && (0 < actualPage))
         {
             actualPage--;
+            actualRow = 0;
         }
         else
         {
@@ -76,41 +79,40 @@ void Dis_Cyclic(void *pvParameters)
 
 static void HandleDisplay(DisPageType * pagePtr)
 {
-    static uint8_t rowCnt = 0;
     switch(dspTask)
     {
         case DIS_DISPLAY_C:
-        if (rowCnt < pagePtr->rows_used)
+        if (actualRow < pagePtr->rows_used)
         {
             // Send constant labels
-            if (DASHAPP_OK == DashApp_Print((DashApp_ContentType *)&pagePtr->labels[rowCnt]))
+            if (DASHAPP_OK == DashApp_Print((DashApp_ContentType *)&pagePtr->labels[actualRow]))
             {
-                rowCnt++;
+                actualRow++;
             }
         }
         else
         {
-            rowCnt = 0;
+            actualRow = 0;
             dspTask = DIS_DISPLAY_V;
         }
         break;
         case DIS_DISPLAY_V:
-        if (rowCnt < (pagePtr->rows_used))
+        if (actualRow < (pagePtr->rows_used))
         {
             // Create strings from KWP data
-            if (ENGINEDIAG_OK == EngineDiag_GetChData(pagePtr->diagChs[rowCnt].diagCh, diagBuffer, pagePtr->diagChs[rowCnt].timeout))
+            if (ENGINEDIAG_OK == EngineDiag_GetChData(pagePtr->diagChs[actualRow].diagCh, diagBuffer, pagePtr->diagChs[actualRow].timeout))
             {
-                Dis_CreateStrings(&dspBuffer,&pages[actualPage].data[rowCnt],diagBuffer);
+                Dis_CreateStrings(&dspBuffer,&pages[actualPage].data[actualRow],diagBuffer);
                 // Send values
                 if (DASHAPP_OK == DashApp_Print(&dspBuffer))
                 {
-                    rowCnt++;
+                    actualRow++;
                 }
             }
         }
         else
         {
-            rowCnt = 0;
+            actualRow = 0;
             dspTask = DIS_DISPLAY_C;
         }
         break;
@@ -122,22 +124,8 @@ static void HandleDisplay(DisPageType * pagePtr)
 static void Dis_CreateStrings(DashApp_ContentType * out, const DashApp_ContentType * const row, uint8_t * data)
 {
     int16_t val_s16 = 0;
-    /*static uint8_t cnt = 0;
-    if (buttons == STALKBUTTONS_UP)
-    {
-        cnt++;
-    }
-    else if ((buttons == STALKBUTTONS_DOWN) && (cnt > 0))
-    {
-        cnt--;
-    }
-    else
-    {
-        //Keep the value
-    }*/
     //out->len = Dis_DecodeFrame(out->string,data);
 
-    //out->len = snprintf(out->string, sizeof(out->string),row->string ,data[0] );
     out->ft = row->ft;
     out->posX = row->posX;
     out->posY = row->posY;
