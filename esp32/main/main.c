@@ -22,8 +22,8 @@ void app_main()
     DashApp_Init();
     EngineDiag_Init();
     Dis_Init();
-    esp_task_wdt_add(NULL);
     #ifdef REDFIS_SINGLE_THREAD
+    esp_task_wdt_add(NULL);
     while(1)
     {
         sysTime = xTaskGetTickCount() * portTICK_PERIOD_MS;
