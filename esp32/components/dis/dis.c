@@ -91,34 +91,21 @@ static void HandleDisplay(DisPageType * pagePtr)
         else
         {
             rowCnt = 0;
-            dspTask = DIS_PROCESS;
-        }
-        break;
-        case DIS_PROCESS:
-        if (rowCnt < pagePtr->rows_used)
-        {
-
-            // Create strings from the data
-            if (ENGINEDIAG_OK == EngineDiag_GetChData(pagePtr->diagChs[rowCnt].diagCh, diagBuffer, pagePtr->diagChs[rowCnt].timeout))
-            {
-                Dis_CreateStrings(&dspBuffer,&pagePtr->data[rowCnt],diagBuffer);
-                dspTask = DIS_DISPLAY_V;
-            }
-        }
-        else
-        {
-            rowCnt = 0;
-            dspTask = DIS_DISPLAY_C;
+            dspTask = DIS_DISPLAY_V;
         }
         break;
         case DIS_DISPLAY_V:
-        if (rowCnt < pagePtr->rows_used)
+        if (rowCnt < (pagePtr->rows_used))
         {
-            // Send values
-            if (DASHAPP_OK == DashApp_Print(&dspBuffer))
+            // Create strings from KWP data
+            if (ENGINEDIAG_OK == EngineDiag_GetChData(pagePtr->diagChs[rowCnt].diagCh, diagBuffer, pagePtr->diagChs[rowCnt].timeout))
             {
-                rowCnt++;
-                dspTask = DIS_PROCESS;
+                Dis_CreateStrings(&dspBuffer,&pages[actualPage].data[rowCnt],diagBuffer);
+                // Send values
+                if (DASHAPP_OK == DashApp_Print(&dspBuffer))
+                {
+                    rowCnt++;
+                }
             }
         }
         else
