@@ -27,9 +27,8 @@ static const DisPageType pages[1] =
     }
 };
 
-static void Dis_Cyclic(void *pvParameters);
 static void Dis_CreateStrings(DashApp_ContentType * out, const DashApp_ContentType * const row, uint8_t * data);
-static void HandleDisplay(void);
+static void HandleDisplay(DisPageType * pagePtr);
 static DisDspTaskType dspTask = DIS_DISPLAY_C;
 static StalkButtons_Type buttons = STALKBUTTONS_NOEVENT;
 static uint8_t actualPage = 0;
@@ -39,34 +38,52 @@ static uint8_t diagBuffer[3u];
 void Dis_Init(void)
 {
     dspTask = DIS_DISPLAY_C;
-    
-    vTaskDelay(160 / portTICK_PERIOD_MS);
+    #ifndef REDFIS_SINGLE_THREAD
+    vTaskDelay(160u / portTICK_PERIOD_MS);
     
     xTaskCreatePinnedToCore(Dis_Cyclic, "Dis", 2048u, NULL, 2, &disTaskHandle,1);
+    #endif
 }
 
-static void Dis_Cyclic(void *pvParameters)
+void Dis_Cyclic(void *pvParameters)
 {
+    DisPageType * pagePtr = NULL;
+    #ifndef REDFIS_SINGLE_THREAD
     while(1)
+    #endif
     {
         buttons = StalkButtons_Get();
-        HandleDisplay();
-        
+        if ((STALKBUTTONS_UP == buttons) && ((sizeof(pages)/sizeof(pages[0]) > actualPage)))
+        {
+            actualPage++;
+        }
+        else if ((STALKBUTTONS_DOWN == buttons) && (0 < actualPage))
+        {
+            actualPage--;
+        }
+        else
+        {
+            // Don't change the page 
+        }
+        pagePtr = (DisPageType *)&pages[actualPage];        
+        HandleDisplay(pagePtr);
+        #ifndef REDFIS_SINGLE_THREAD
         vTaskDelay(300 / portTICK_PERIOD_MS);
+        #endif
     }
 }
 
 
-static void HandleDisplay(void)
+static void HandleDisplay(DisPageType * pagePtr)
 {
     static uint8_t rowCnt = 0;
     switch(dspTask)
     {
         case DIS_DISPLAY_C:
-        if (rowCnt < pages[actualPage].rows_used)
+        if (rowCnt < pagePtr->rows_used)
         {
             // Send constant labels
-            if (DASHAPP_OK == DashApp_Print((DashApp_ContentType *)&pages[actualPage].labels[rowCnt]))
+            if (DASHAPP_OK == DashApp_Print((DashApp_ContentType *)&pagePtr->labels[rowCnt]))
             {
                 rowCnt++;
             }
@@ -78,13 +95,13 @@ static void HandleDisplay(void)
         }
         break;
         case DIS_PROCESS:
-        if (rowCnt < pages[actualPage].rows_used)
+        if (rowCnt < pagePtr->rows_used)
         {
 
             // Create strings from the data
-            if (ENGINEDIAG_OK == EngineDiag_GetChData(pages[actualPage].diagChs[rowCnt], diagBuffer, 10000u))
+            if (ENGINEDIAG_OK == EngineDiag_GetChData(pagePtr->diagChs[rowCnt].diagCh, diagBuffer, pagePtr->diagChs[rowCnt].timeout))
             {
-                Dis_CreateStrings(&dspBuffer,&pages[actualPage].data[rowCnt],diagBuffer);
+                Dis_CreateStrings(&dspBuffer,&pagePtr->data[rowCnt],diagBuffer);
                 dspTask = DIS_DISPLAY_V;
             }
         }
@@ -95,7 +112,7 @@ static void HandleDisplay(void)
         }
         break;
         case DIS_DISPLAY_V:
-        if (rowCnt < pages[actualPage].rows_used)
+        if (rowCnt < pagePtr->rows_used)
         {
             // Send values
             if (DASHAPP_OK == DashApp_Print(&dspBuffer))

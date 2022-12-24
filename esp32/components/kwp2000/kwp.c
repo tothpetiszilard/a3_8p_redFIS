@@ -39,7 +39,6 @@ static uint8_t        dataId = 1u;
 static uint8_t        ecuId = 1;
 static uint8_t        retry = 0;
 
-static void Kwp_Cyclic(void *pvParameters);
 static void Kwp_StartSession(uint8_t sessionId);
 static void Kwp_ReadEcuId(uint8_t idOption);
 static void Kwp_StartRoutine(uint8_t rid, uint16_t rEntOpt);
@@ -50,7 +49,9 @@ void Kwp_Init(uint8_t ecu)
     ecuId = ecu;
     retry = 0;
     diagStage = KWP_CONNECT;
+    #ifndef REDFIS_SINGLE_THREAD
     xTaskCreatePinnedToCore(Kwp_Cyclic, "Kwp2000", 2048, NULL, 4, &KwpTaskHdl,1);
+    #endif
 }
 
 Kwp_ReturnType Kwp_RequestData(uint8_t did)
@@ -84,12 +85,16 @@ Kwp_ReturnType Kwp_GetDataFromECU(uint8_t * const dataPtr)
     return retVal;
 }
 
-static void Kwp_Cyclic(void *pvParameters)
+void Kwp_Cyclic(void *pvParameters)
 {
     static uint8_t timeout = 0;
+    #ifndef REDFIS_SINGLE_THREAD
     while(1)
+    #endif
     {
+        #ifndef REDFIS_SINGLE_THREAD
         vTaskDelay(50u / portTICK_PERIOD_MS);
+        #endif
         if (KWP_IDLE == commandStatus)
         {
             timeout=0u;
@@ -110,7 +115,9 @@ static void Kwp_Cyclic(void *pvParameters)
                     else 
                     {
                         retry++;
+                        #ifndef REDFIS_SINGLE_THREAD
                         vTaskDelay(500u / portTICK_PERIOD_MS);
+                        #endif
                     }
                 }
                 break;
@@ -131,7 +138,9 @@ static void Kwp_Cyclic(void *pvParameters)
                 break;
                 case KWP_CLOSE:
                 Kwp_DisconnectTp();
+                #ifndef REDFIS_SINGLE_THREAD
                 vTaskDelay(1000u / portTICK_PERIOD_MS);
+                #endif
                 retry = 0;
                 diagStage = KWP_CONNECT;
                 break;

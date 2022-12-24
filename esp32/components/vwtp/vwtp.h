@@ -10,6 +10,7 @@
 typedef uint8_t VwTp_ReturnType;
 
 extern void VwTp_Init(void);
+extern void VwTp_Cyclic(void *pvParameters);
 extern VwTp_ReturnType VwTp_Connect(uint8_t ecuId);
 extern void VwTp_Disconnect(uint8_t chId);
 extern VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len);

@@ -31,6 +31,7 @@ typedef struct
 }DashApp_ContentType;
 
 extern void DashApp_Init(void);
+extern void DashApp_Cyclic(void *pvParameters);
 
 extern DashApp_ReturnType DashApp_Print(const DashApp_ContentType * const content);
 

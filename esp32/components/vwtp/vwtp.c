@@ -22,8 +22,6 @@ static void VwTp_sendAck(VwTp_ChannelType * const chPtr);
 static void VwTp_sendBreak(VwTp_ChannelType * const chPtr);
 
 
-static void VwTp_Cyclic(void *pvParameters);
-
 void VwTp_Init(void)
 {
     uint8_t i = 0;
@@ -33,7 +31,9 @@ void VwTp_Init(void)
         vwtp_channels[i].rxState = VWTP_CONNECT;
         vwtp_channels[i].seqCntRx = 0xFu; // 0 is expected in the first frame
     }
+    #ifndef REDFIS_SINGLE_THREAD
     xTaskCreatePinnedToCore(VwTp_Cyclic, "VwTp", 2048u, NULL, 5, &VwTpTaskHdl,1);
+    #endif
     //TODO: 0x9, ACK, not ready for next packet: should be handled better
 }
 
@@ -126,11 +126,13 @@ static void VwTp_HandleTxTimeout(VwTp_ChannelType * const chPtr)
     }
 }
 
-static void VwTp_Cyclic(void *pvParameters)
+void VwTp_Cyclic(void *pvParameters)
 {
     uint8_t chId = 0;
     VwTp_ChannelType * chPtr = NULL;
+    #ifndef REDFIS_SINGLE_THREAD
     while(1)
+    #endif
     {
         for (chId = 0;chId < (sizeof(vwtp_channels)/sizeof(vwtp_channels[0]));chId++ )
         {
@@ -139,7 +141,9 @@ static void VwTp_Cyclic(void *pvParameters)
             VwTp_HandleTx(chPtr); // TODO: Requesting ACK after x transmitted frames 
             VwTp_HandleCallbacks(chPtr);
             VwTp_HandleRxTimeout(chPtr);
+            #ifndef REDFIS_SINGLE_THREAD
             vTaskDelay((10u/(sizeof(vwtp_channels)/sizeof(vwtp_channels[0]))) / portTICK_PERIOD_MS);
+            #endif
         }
     }
 }

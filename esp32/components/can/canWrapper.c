@@ -6,7 +6,6 @@
 #include "canWrapper.h"
 #include "canWrapper_Cfg.h"
 
-static void Can_Receive(void *pvParameters);
 static TaskHandle_t CanTaskHdl = NULL;
 
 void Can_Init(void)
@@ -15,6 +14,7 @@ void Can_Init(void)
     twai_timing_config_t tcfg = TWAI_TIMING_CONFIG_500KBITS();
     twai_filter_config_t fcfg;
     gcfg.tx_queue_len = 10;
+    gcfg.rx_queue_len = 15;
     gcfg.intr_flags |= ESP_INTR_FLAG_IRAM;
     // Accepted IDs are: 35F (stalk buttons), 6c1 (dash), 201 (engine), 300 (engine)
     fcfg.acceptance_code = (0x35Fu << 21u) | (0x200u << 5u);
@@ -22,16 +22,24 @@ void Can_Init(void)
     fcfg.single_filter = false;
     twai_driver_install(&gcfg, &tcfg, &fcfg);
     twai_start();
+    #ifndef REDFIS_SINGLE_THREAD
     xTaskCreatePinnedToCore(Can_Receive, "CanRx", 2048, NULL, 6, &CanTaskHdl,1);
+    #endif
 }
 
-static void Can_Receive(void *pvParameters)
+void Can_Receive(void *pvParameters)
 {
     twai_message_t msg;
     esp_err_t result;
+    #ifndef REDFIS_SINGLE_THREAD
     while(1)
+    #endif
     {
+        #ifndef REDFIS_SINGLE_THREAD
         result = twai_receive(&msg, portMAX_DELAY);
+        #else
+        result = twai_receive(&msg, 0u);
+        #endif
         if(result == ESP_OK)
         {
             // CAN frame received

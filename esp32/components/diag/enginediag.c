@@ -61,15 +61,18 @@ const uint8_t ChIdxToDidOffset[ENGINEDIAG_CH_MAX] =
     [ENGINEDIAG_CH_LAMBDA74] = 2u
 };
 
-static void EngineDiag_Cyclic(void *pvParameters);
 static void EngineDiag_HandleDid(uint8_t * buffer);
 
 void EngineDiag_Init(void)
 {
+    #ifndef REDFIS_SINGLE_THREAD
     vTaskDelay(210u / portTICK_PERIOD_MS);
+    #endif
     Kwp_Init(0x01u);
     state = ENGINEDIAG_IDLE;
+    #ifndef REDFIS_SINGLE_THREAD
     xTaskCreatePinnedToCore(EngineDiag_Cyclic, "EngineDiag", 2048u, NULL, 3, &taskHandle,1);
+    #endif
 }
 
 EngineDiag_ReturnType EngineDiag_GetChData(const EngineDiag_ChannelIdType ch, uint8_t * dataPtr, uint32_t timeout)
@@ -107,13 +110,17 @@ EngineDiag_ReturnType EngineDiag_GetChData(const EngineDiag_ChannelIdType ch, ui
     return retVal;
 }
 
-static void EngineDiag_Cyclic(void *pvParameters)
+void EngineDiag_Cyclic(void *pvParameters)
 {
     static uint8_t errCnt = 0;
     uint8_t didBuffer[4u*3u];
+    #ifndef REDFIS_SINGLE_THREAD
     while(1)
+    #endif
     {
+        #ifndef REDFIS_SINGLE_THREAD
         vTaskDelay(50u / portTICK_PERIOD_MS);
+        #endif
         switch(state)
         {
             case ENGINEDIAG_IDLE:
@@ -146,7 +153,9 @@ static void EngineDiag_Cyclic(void *pvParameters)
             default:
             break;
         }
+        #ifndef REDFIS_SINGLE_THREAD
         vTaskDelay(50u / portTICK_PERIOD_MS);
+        #endif
     }
 }
 

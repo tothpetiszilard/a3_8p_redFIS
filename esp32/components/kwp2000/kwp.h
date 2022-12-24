@@ -9,6 +9,7 @@
 typedef uint8_t Kwp_ReturnType;
 
 extern void Kwp_Init(uint8_t ecuId);
+extern void Kwp_Cyclic(void *pvParameters);
 
 extern Kwp_ReturnType Kwp_RequestData(uint8_t did);
 extern Kwp_ReturnType Kwp_GetDataFromECU(uint8_t * const dataPtr);
