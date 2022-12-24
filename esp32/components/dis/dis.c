@@ -52,8 +52,20 @@ void Dis_Cyclic(void *pvParameters)
     while(1)
     #endif
     {
-        pagePtr = (DisPageType *)&pages[actualPage];
         buttons = StalkButtons_Get();
+        if ((STALKBUTTONS_UP == buttons) && ((sizeof(pages)/sizeof(pages[0]) > actualPage)))
+        {
+            actualPage++;
+        }
+        else if ((STALKBUTTONS_DOWN == buttons) && (0 < actualPage))
+        {
+            actualPage--;
+        }
+        else
+        {
+            // Don't change the page 
+        }
+        pagePtr = (DisPageType *)&pages[actualPage];        
         HandleDisplay(pagePtr);
         #ifndef REDFIS_SINGLE_THREAD
         vTaskDelay(300 / portTICK_PERIOD_MS);
