@@ -69,14 +69,18 @@ void DashApp_Cyclic(void *pvParameters)
             switch(appState)
             {
                 case DASHAPP_INIT:
-                if (initTimeout < 120u)
+                if (0 != DASHAPP_GETIGNITION())
                 {
-                    initTimeout++;
-                }
-                else 
-                {
-                    initTimeout = 0;
-                    appState = DASHAPP_PWRSTATE;
+
+                    if (initTimeout < 120u)
+                    {
+                        initTimeout++;
+                    }
+                    else 
+                    {
+                        initTimeout = 0;
+                        appState = DASHAPP_PWRSTATE;
+                    }
                 }
                 break;
                 case DASHAPP_PWRSTATE:
@@ -111,6 +115,24 @@ void DashApp_Cyclic(void *pvParameters)
         vTaskDelay(30 / portTICK_PERIOD_MS);
         #endif
     }
+}
+
+DashApp_ReturnType DashApp_GetStatus(void)
+{
+    DashApp_ReturnType retVal = DASHAPP_ERR;
+    if (DASHAPP_READY == appState)
+    {
+        retVal = DASHAPP_OK;
+    }
+    else if (DASHAPP_WRITE == appState)
+    {
+        retVal = DASHAPP_BUSY;
+    }
+    else 
+    {
+        /* Return not ok */
+    }
+    return retVal;
 }
 
 DashApp_ReturnType DashApp_Print(const DashApp_ContentType * const content)

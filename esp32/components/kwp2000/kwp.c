@@ -2,6 +2,7 @@
 #include "kwp_cfg.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "sysStates.h"
 
 #define KWP_SID_SESSION (0x10u) // Start diagnostic session
 #define KWP_SID_RID     (0x31u) // Start routine by local identifier
@@ -98,54 +99,64 @@ void Kwp_Cyclic(void *pvParameters)
         if (KWP_IDLE == commandStatus)
         {
             timeout=0u;
-            switch(diagStage)
+            if (0 != SysStates_GetIgnition())
             {
-                case KWP_CONNECT:
-                if (KWP_OK == Kwp_ConnectTp(ecuId))
+                switch(diagStage)
                 {
-                    commandStatus = KWP_INPROGRESS;
-                }
-                else 
-                {
-                    if (retry > 10u)
+                    case KWP_CONNECT:
+                    if (KWP_OK == Kwp_ConnectTp(ecuId))
                     {
-                        retry = 0;
-                        diagStage = KWP_ERROR;
+                        commandStatus = KWP_INPROGRESS;
                     }
                     else 
                     {
-                        retry++;
-                        #ifndef REDFIS_SINGLE_THREAD
-                        vTaskDelay(500u / portTICK_PERIOD_MS);
-                        #endif
+                        if (retry > 10u)
+                        {
+                            retry = 0;
+                            diagStage = KWP_ERROR;
+                        }
+                        else 
+                        {
+                            retry++;
+                            #ifndef REDFIS_SINGLE_THREAD
+                            vTaskDelay(500u / portTICK_PERIOD_MS);
+                            #endif
+                        }
                     }
+                    break;
+                    case KWP_INIT:
+                    Kwp_StartSession(0x89u);
+                    break;
+                    case KWP_SESSION:
+                    Kwp_ReadEcuId(0x9Bu);
+                    break;
+                    case KWP_ECUID:
+                    Kwp_StartRoutine(0xB8u, 0x0000u);
+                    break;
+                    case KWP_ROUTINE:
+                    diagStage = KWP_READY;
+                    break;
+                    case KWP_READDID:
+                    Kwp_ReadData(dataId);
+                    break;
+                    case KWP_CLOSE:
+                    Kwp_DisconnectTp();
+                    #ifndef REDFIS_SINGLE_THREAD
+                    vTaskDelay(1000u / portTICK_PERIOD_MS);
+                    #endif
+                    retry = 0;
+                    diagStage = KWP_CONNECT;
+                    break;
+                    default:
+                    break;
                 }
-                break;
-                case KWP_INIT:
-                Kwp_StartSession(0x89u);
-                break;
-                case KWP_SESSION:
-                Kwp_ReadEcuId(0x9Bu);
-                break;
-                case KWP_ECUID:
-                Kwp_StartRoutine(0xB8u, 0x0000u);
-                break;
-                case KWP_ROUTINE:
-                diagStage = KWP_READY;
-                break;
-                case KWP_READDID:
-                Kwp_ReadData(dataId);
-                break;
-                case KWP_CLOSE:
-                Kwp_DisconnectTp();
-                #ifndef REDFIS_SINGLE_THREAD
-                vTaskDelay(1000u / portTICK_PERIOD_MS);
-                #endif
-                retry = 0;
-                diagStage = KWP_CONNECT;
-                break;
-                default:
-                break;
+            }
+            else 
+            {
+                if (diagStage != KWP_CONNECT)
+                {
+                    Kwp_DisconnectTp();
+                } 
             }
         }
         else if (KWP_INPROGRESS == commandStatus)
@@ -183,6 +194,10 @@ void Kwp_Cyclic(void *pvParameters)
             {
                 timeout++;
             }
+        }
+        else 
+        {
+            // Error state
         }
     }
 }

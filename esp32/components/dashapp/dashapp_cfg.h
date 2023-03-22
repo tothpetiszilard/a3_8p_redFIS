@@ -2,6 +2,7 @@
 #define DASHAPP_CFG_H
 
 #include "vwtp.h"
+#include "sysStates.h"
 
 #define DASHAPP_CMD_PWRSTATE            ((uint8_t)0x00u)
 #define DASHAPP_CMD_PWRREPORT           ((uint8_t)0x01u)
@@ -20,6 +21,7 @@
 
 #define DASHAPP_SENDTP(buffer, len)     (VwTp_Send(0u, buffer, len))
 #define DASHAPP_DISCONNECT()            (VwTp_Disconnect(0u))
+#define DASHAPP_GETIGNITION()           (SysStates_GetIgnition())
 
 const uint8_t DashApp_DspInit[] = 
 {

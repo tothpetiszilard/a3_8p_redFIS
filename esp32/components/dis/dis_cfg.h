@@ -13,9 +13,11 @@ typedef struct
 
 typedef struct
 {
-    const uint8_t rows_used;
+    const uint8_t labelCnt;
     const DashApp_ContentType * const labels;
+    const uint8_t dataCnt;
     const DashApp_ContentType * const data;
+    const uint8_t diagCnt;
     const DiagIdType * const diagChs;
 }DisPageType;
 

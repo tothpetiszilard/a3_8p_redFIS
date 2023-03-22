@@ -16,9 +16,9 @@ void Can_Init(void)
     gcfg.tx_queue_len = 10;
     gcfg.rx_queue_len = 15;
     gcfg.intr_flags |= ESP_INTR_FLAG_IRAM;
-    // Accepted IDs are: 35F (stalk buttons), 6c1 (dash), 201 (engine), 300 (engine)
-    fcfg.acceptance_code = (0x35Fu << 21u) | (0x200u << 5u);
-    fcfg.acceptance_mask = 0x001FB83Fu;
+    // Accepted IDs are: 35F (stalk buttons), 575 (ignition), 6c1 (dash), 201 (engine), 300 (engine)
+    fcfg.acceptance_code = (0x155u << 21u) | (0x200u << 5u);
+    fcfg.acceptance_mask = 0xC55FB83Fu;
     fcfg.single_filter = false;
     twai_driver_install(&gcfg, &tcfg, &fcfg);
     twai_start();
@@ -43,9 +43,13 @@ void Can_Receive(void *pvParameters)
         if(result == ESP_OK)
         {
             // CAN frame received
-            if (CAN_RXID == msg.identifier)
+            if (CAN_STALK_RXID == msg.identifier)
             {
-                CAN_RXINDICATION(msg.data[1u]);
+                CAN_STALK_RXINDICATION(msg.data[1u]);
+            }
+            else if (CAN_IGNITION_RXID == msg.identifier)
+            {
+                CAN_IGN_RXINDICATION(msg.data[0u]);
             }
             else 
             {
