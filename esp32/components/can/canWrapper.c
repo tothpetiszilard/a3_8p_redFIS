@@ -25,6 +25,7 @@ void Can_Init(void)
     #ifndef REDFIS_SINGLE_THREAD
     xTaskCreatePinnedToCore(Can_Receive, "CanRx", 2048, NULL, 6, &CanTaskHdl,1);
     #endif
+    CAN_IGN_RXINDICATION(0u); // Go to sleep if no message received for 10 seconds
 }
 
 void Can_Receive(void *pvParameters)

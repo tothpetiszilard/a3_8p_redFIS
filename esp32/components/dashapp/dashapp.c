@@ -66,12 +66,11 @@ void DashApp_Cyclic(void *pvParameters)
     {
         if (0 == waitForAck)
         {
-            switch(appState)
+            if (0 != DASHAPP_GETIGNITION())
             {
-                case DASHAPP_INIT:
-                if (0 != DASHAPP_GETIGNITION())
+                switch(appState)
                 {
-
+                    case DASHAPP_INIT:
                     if (initTimeout < 120u)
                     {
                         initTimeout++;
@@ -81,34 +80,43 @@ void DashApp_Cyclic(void *pvParameters)
                         initTimeout = 0;
                         appState = DASHAPP_PWRSTATE;
                     }
+                    break;
+                    case DASHAPP_PWRSTATE:
+                    DashApp_SendPwrReport();
+                    break;
+                    case DASHAPP_IDREQ:
+                    DashApp_GetDashID();
+                    break;
+                    case DASHAPP_PAGEREQ:
+                    DashApp_ReqMfaPage(0u);
+                    break;
+                    case DASHAPP_GETSTATUS:
+                    DashApp_ReqArea(0u,27u,64u,48u,1u);
+                    break;
+                    case DASHAPP_SEND2F:
+                    DashApp_Send2FResp();
+                    break;
+                    case DASHAPP_PREWRITE:
+                    DashApp_InitDisplay();
+                    break;
+                    case DASHAPP_WRITE:
+                    DashApp_Write();
+                    break;
+                    case DASHAPP_SHOW:
+                    DashApp_Show();// Show page 
+                    break;
+                    default:
+                    break;
                 }
-                break;
-                case DASHAPP_PWRSTATE:
-                DashApp_SendPwrReport();
-                break;
-                case DASHAPP_IDREQ:
-                DashApp_GetDashID();
-                break;
-                case DASHAPP_PAGEREQ:
-                DashApp_ReqMfaPage(0u);
-                break;
-                case DASHAPP_GETSTATUS:
-                DashApp_ReqArea(0u,27u,64u,48u,1u);
-                break;
-                case DASHAPP_SEND2F:
-                DashApp_Send2FResp();
-                break;
-                case DASHAPP_PREWRITE:
-                DashApp_InitDisplay();
-                break;
-                case DASHAPP_WRITE:
-                DashApp_Write();
-                break;
-                case DASHAPP_SHOW:
-                DashApp_Show();// Show page 
-                break;
-                default:
-                break;
+            }
+            else
+            {
+                if (DASHAPP_INIT != appState)
+                {
+                    DASHAPP_DISCONNECT();
+                    appState = DASHAPP_INIT;
+                    waitForAck = 0;
+                }
             }
         }
         #ifndef REDFIS_SINGLE_THREAD
