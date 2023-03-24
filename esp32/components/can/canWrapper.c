@@ -16,9 +16,15 @@ void Can_Init(void)
     gcfg.tx_queue_len = 10;
     gcfg.rx_queue_len = 15;
     gcfg.intr_flags |= ESP_INTR_FLAG_IRAM;
-    // Accepted IDs are: 35F (stalk buttons), 575 (ignition), 6c1 (dash), 201 (engine), 300 (engine)
+    // Set up CAN ID filter
     fcfg.acceptance_code = (0x155u << 21u) | (0x200u << 5u);
+    #if (1 == CONFIG_VWTP_DASH_TX_ID_AUTO_TRANS)
+    // Accepted IDs are: 35F (stalk buttons), 575 (ignition), 6c3 (trans), 201 (engine), 300 (engine)
+    fcfg.acceptance_mask = 0xC55FB87Fu;
+    #elif( 1 == CONFIG_VWTP_DASH_TX_ID_NAVIGATION_RNSE)
+    // Accepted IDs are: 35F (stalk buttons), 575 (ignition), 6c1 (dash), 201 (engine), 300 (engine)
     fcfg.acceptance_mask = 0xC55FB83Fu;
+    #endif
     fcfg.single_filter = false;
     twai_driver_install(&gcfg, &tcfg, &fcfg);
     twai_start();

@@ -1468,6 +1468,13 @@ CONFIG_WPA_MBEDTLS_TLS_CLIENT=y
 # CONFIG_WPA_11R_SUPPORT is not set
 # CONFIG_WPA_WPS_SOFTAP_REGISTRAR is not set
 # end of Supplicant
+
+#
+# VWTP Configuration
+#
+CONFIG_VWTP_DASH_TX_ID_NAVIGATION_RNSE=y
+# CONFIG_VWTP_DASH_TX_ID_AUTO_TRANS is not set
+# end of VWTP Configuration
 # end of Component config
 
 # Deprecated options for backward compatibility

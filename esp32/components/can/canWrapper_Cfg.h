@@ -4,6 +4,7 @@
 #include "vwtp.h"
 #include "stalkButtons.h"
 #include "sysStates.h"
+#include "sdkconfig.h"
 
 #define CAN_STALK_RXID                               (STALKBUTTONS_RXID)
 #define CAN_IGNITION_RXID                            (SS_IGNITION_RXID)

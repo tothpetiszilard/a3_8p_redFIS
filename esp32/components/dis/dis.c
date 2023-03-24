@@ -36,6 +36,7 @@ static uint8_t actualPage = 0;
 static uint8_t actualRow = 0;
 static DashApp_ContentType dspBuffer;
 static uint8_t diagBuffer[3u];
+static uint8_t exited = 0;
 
 void Dis_Init(void)
 {
@@ -65,6 +66,26 @@ void Dis_Cyclic(void *pvParameters)
             {
                 actualPage--;
                 actualRow = 0;
+            }
+            else if (STALKBUTTONS_RESET == buttons)
+            {
+                if (0 == exited)
+                {
+                    if (DASHAPP_OK == DashApp_Exit())
+                    {
+                        exited = 1;
+                        actualRow = 0;
+                    }
+                    
+                }
+                else 
+                {
+                    if (DASHAPP_OK == DashApp_Enter())
+                    {
+                        exited = 0;
+                    }
+                }
+                
             }
             else
             {

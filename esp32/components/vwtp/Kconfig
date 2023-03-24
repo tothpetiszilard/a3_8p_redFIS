@@ -1,0 +1,23 @@
+menu "VWTP Configuration"
+
+    choice VWTP_DASH_TX_ID
+        prompt "Choose the CAN TX ID for the VWTP channel to the dashboard:"
+        default VWTP_DASH_TX_ID_NAVIGATION_RNSE
+        help
+            Choose the CAN TX ID for the VWTP channel to the dashboard.
+            6C0 is used by RNS-E, dont select it if you have RNS-E navigation installed.
+            6C2 is used by Automatic transmission, dont select it if you have auto transmission.
+
+        config VWTP_DASH_TX_ID_NAVIGATION_RNSE
+            bool "Use 6C0 (Navigation)"
+            help
+                6C0 will be used, dont select this if you have RNS-E navigation installed.
+
+        config VWTP_DASH_TX_ID_AUTO_TRANS
+            bool "Use 6C2 (Transmission)"
+            help
+                6C2 will be used, dont select this if you have auto transmission installed.
+    endchoice # VWTP_DASH_TX_ID
+
+endmenu # "VWTP Configuration"
+

@@ -18,7 +18,9 @@ typedef enum
     DASHAPP_SHOW=7,
     DASHAPP_WRITE=8,
     DASHAPP_READY=9,
+    DASHAPP_CLEAR = 10,
     DASHAPP_WAIT,
+    DASHAPP_SUSPEND,
     DASHAPP_SHUTDOWN
 } DashApp_StateType;
 
@@ -44,7 +46,7 @@ static void DashApp_Write(void);
 static void DashApp_Send2FResp(void);
 static void DashApp_Show(void);
 static void DashApp_InitDisplay(void);
-//static void DashApp_Clear(void);
+static void DashApp_Clear(void);
 
 void DashApp_Init(void)
 {
@@ -105,6 +107,9 @@ void DashApp_Cyclic(void *pvParameters)
                     case DASHAPP_SHOW:
                     DashApp_Show();// Show page 
                     break;
+                    case DASHAPP_CLEAR:
+                    DashApp_Clear();// Delete page 
+                    break;
                     default:
                     break;
                 }
@@ -130,6 +135,44 @@ DashApp_ReturnType DashApp_GetStatus(void)
     DashApp_ReturnType retVal = DASHAPP_ERR;
     if (DASHAPP_READY == appState)
     {
+        retVal = DASHAPP_OK;
+    }
+    else if (DASHAPP_WRITE == appState)
+    {
+        retVal = DASHAPP_BUSY;
+    }
+    else if (DASHAPP_SUSPEND == appState)
+    {
+        retVal = DASHAPP_BUSY;
+    }
+    else 
+    {
+        /* Return not ok */
+    }
+    return retVal;
+}
+
+DashApp_ReturnType DashApp_Enter(void)
+{
+    DashApp_ReturnType retVal = DASHAPP_ERR;
+    if (DASHAPP_SUSPEND == appState)
+    {
+        appState = DASHAPP_GETSTATUS;
+        retVal = DASHAPP_OK;
+    }
+    else 
+    {
+        /* Return not ok */
+    }
+    return retVal;
+}
+
+DashApp_ReturnType DashApp_Exit(void)
+{
+    DashApp_ReturnType retVal = DASHAPP_ERR;
+    if (DASHAPP_READY == appState)
+    {
+        appState = DASHAPP_CLEAR;
         retVal = DASHAPP_OK;
     }
     else if (DASHAPP_WRITE == appState)
@@ -370,6 +413,17 @@ static void DashApp_Show(void)
     {
         waitForAck = 1u;
         appState = DASHAPP_READY;
+    }
+}
+
+static void DashApp_Clear(void)
+{
+    uint8_t msg[1];
+    msg[0] = DASHAPP_CMD_CLEAR;
+    if (VWTP_OK == DASHAPP_SENDTP(msg,sizeof(msg)))
+    {
+        waitForAck = 1u;
+        appState = DASHAPP_SUSPEND;
     }
 }
 
