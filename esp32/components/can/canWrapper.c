@@ -18,7 +18,7 @@ void Can_Init(void)
     gcfg.intr_flags |= ESP_INTR_FLAG_IRAM;
     // Set up CAN ID filter
     fcfg.acceptance_code = (0x155u << 21u) | (0x200u << 5u);
-    #if (1 == CONFIG_VWTP_DASH_TX_ID_AUTO_TRANS)
+    #if (1 == CONFIG_VWTP_DASH_TX_ID_ALTERNATIVE)
     // Accepted IDs are: 35F (stalk buttons), 575 (ignition), 6c3 (trans), 201 (engine), 300 (engine)
     fcfg.acceptance_mask = 0xC55FB87Fu;
     #elif( 1 == CONFIG_VWTP_DASH_TX_ID_NAVIGATION_RNSE)

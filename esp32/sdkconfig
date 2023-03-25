@@ -1473,7 +1473,7 @@ CONFIG_WPA_MBEDTLS_TLS_CLIENT=y
 # VWTP Configuration
 #
 CONFIG_VWTP_DASH_TX_ID_NAVIGATION_RNSE=y
-# CONFIG_VWTP_DASH_TX_ID_AUTO_TRANS is not set
+# CONFIG_VWTP_DASH_TX_ID_ALTERNATIVE is not set
 # end of VWTP Configuration
 # end of Component config
 
