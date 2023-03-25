@@ -1,5 +1,4 @@
 # Audi A3 8P Red FIS Project
-====================
 <b>This is a project about discovering (reverse-engineering) Audi A3 8P dashboard's Driver Information System and its protocol.</b>
 
 For people who don't know what is DIS or FIS:
