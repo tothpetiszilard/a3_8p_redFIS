@@ -13,13 +13,13 @@ static void ShutdownHook(void *pvParameters);
 void SysStates_Receive(uint8_t data)
 {
     ignitionState_u8 = (data & 0xFu);
-    if ((0 != (ignitionState_u8 & 7u)) && (0 !=shutdownStarted))
+    if ((0 != (ignitionState_u8 & 6u)) && (0 !=shutdownStarted))
     {
         vTaskDelete(ShutdownHookHdl);
         //printf("Shutdown cancelled\n");
         shutdownStarted = 0;
     }
-    else if ((0 == (ignitionState_u8 & 7u)) && (0 == shutdownStarted))
+    else if ((0 == (ignitionState_u8 & 6u)) && (0 == shutdownStarted))
     {
         xTaskCreatePinnedToCore(ShutdownHook, "ShutdownHook", 1024u, NULL, 6, &ShutdownHookHdl,1);
         shutdownStarted = 1;
@@ -43,7 +43,7 @@ static void ShutdownHook(void *pvParameters)
 uint8_t SysStates_GetIgnition(void)
 {
     uint8_t retVal_u8 = 0;
-    if (0 != (ignitionState_u8 & 7u))
+    if (0 != (ignitionState_u8 & 6u))
     {
         retVal_u8 = 1;
     }
