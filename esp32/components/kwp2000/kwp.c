@@ -1,3 +1,5 @@
+/* Partial implementation of Keyword Protokoll */
+
 #include "kwp.h"
 #include "kwp_cfg.h"
 #include "freertos/FreeRTOS.h"
@@ -33,26 +35,61 @@ typedef enum
 } Kwp_StageType;
 
 static Kwp_StatusType commandStatus = KWP_IDLE;
-static Kwp_StageType  diagStage = KWP_INIT;
+static Kwp_StageType  diagStage = KWP_CONNECT;
 static TaskHandle_t   KwpTaskHdl = NULL;
 static uint8_t        didBuffer[12u];
 static uint8_t        dataId = 1u;
 static uint8_t        ecuId = 1;
 static uint8_t        retry = 0;
+static uint8_t        active = 0;
 
 static void Kwp_StartSession(uint8_t sessionId);
 static void Kwp_ReadEcuId(uint8_t idOption);
 static void Kwp_StartRoutine(uint8_t rid, uint16_t rEntOpt);
 static void Kwp_ReadData(uint8_t did);
 
-void Kwp_Init(uint8_t ecu)
+Kwp_ReturnType Kwp_Init(uint8_t ecu)
 {
-    ecuId = ecu;
-    retry = 0;
-    diagStage = KWP_CONNECT;
-    #ifndef REDFIS_SINGLE_THREAD
-    xTaskCreatePinnedToCore(Kwp_Cyclic, "Kwp2000", 2048, NULL, 4, &KwpTaskHdl,1);
-    #endif
+    Kwp_ReturnType retVal = KWP_ERR;
+    if (0 == active)
+    {
+        ecuId = ecu;
+        retry = 0;
+        active = 0;
+        diagStage = KWP_CONNECT;
+        #ifndef REDFIS_SINGLE_THREAD
+        xTaskCreatePinnedToCore(Kwp_Cyclic, "Kwp2000", 2048, NULL, 4, &KwpTaskHdl,1);
+        #endif
+        retVal = KWP_OK;
+    }
+    return retVal;
+}
+
+Kwp_ReturnType Kwp_DeInit(void)
+{
+    Kwp_ReturnType retVal = KWP_ERR;
+    if ((1 == active) && (KWP_IDLE == commandStatus))
+    {
+        diagStage = KWP_CLOSE;
+        vTaskDelay(150u / portTICK_PERIOD_MS); // 150 ms delay to close connection from cyclic
+        if (0 == active)
+        {
+            // Shutdown was successful
+            vTaskDelete(KwpTaskHdl);
+            retVal = KWP_OK;
+        }
+    }
+    return retVal;
+}
+
+Kwp_ReturnType Kwp_GetConnectionState(void)
+{
+    Kwp_ReturnType retVal = KWP_ERR;
+    if (0 != active)
+    {
+        retVal = KWP_OK;
+    }
+    return retVal;
 }
 
 Kwp_ReturnType Kwp_RequestData(uint8_t did)
@@ -141,6 +178,7 @@ void Kwp_Cyclic(void *pvParameters)
                     break;
                     case KWP_CLOSE:
                     Kwp_DisconnectTp();
+                    active = 0;
                     #ifndef REDFIS_SINGLE_THREAD
                     vTaskDelay(1000u / portTICK_PERIOD_MS);
                     #endif
@@ -156,6 +194,9 @@ void Kwp_Cyclic(void *pvParameters)
                 if (diagStage != KWP_CONNECT)
                 {
                     Kwp_DisconnectTp();
+                    retry = 0;
+                    diagStage = KWP_CONNECT;
+                    active = 0;
                 } 
             }
         }
@@ -256,6 +297,7 @@ void Kwp_TxConfirmation(uint8_t result)
         {
             diagStage = KWP_INIT;
             commandStatus = KWP_IDLE;
+            active = 1;
         }
         else
         {
@@ -267,6 +309,7 @@ void Kwp_TxConfirmation(uint8_t result)
         commandStatus = KWP_IDLE;
         retry = 0;
         diagStage = KWP_CONNECT;
+        active = 0;
     }
     else 
     {

@@ -1,3 +1,5 @@
+/* Partial implementation of Keyword Protokoll */
+
 #ifndef KWP2000_H_
 #define KWP2000_H_
 
@@ -8,7 +10,8 @@
 
 typedef uint8_t Kwp_ReturnType;
 
-extern void Kwp_Init(uint8_t ecuId);
+extern Kwp_ReturnType Kwp_Init(uint8_t ecuId);
+extern Kwp_ReturnType Kwp_DeInit(void);
 extern void Kwp_Cyclic(void *pvParameters);
 
 extern Kwp_ReturnType Kwp_RequestData(uint8_t did);
