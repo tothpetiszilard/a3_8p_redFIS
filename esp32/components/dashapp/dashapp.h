@@ -1,3 +1,5 @@
+/* Emulation of Navigation which communicates to Dash */
+
 #ifndef DASHAPP_H_
 #define DASHAPP_H_
 

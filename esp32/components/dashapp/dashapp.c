@@ -1,3 +1,5 @@
+/* Emulation of Navigation which communicates to Dash */
+
 #include "dashapp.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"

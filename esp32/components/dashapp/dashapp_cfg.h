@@ -1,3 +1,5 @@
+/* Emulation of Navigation which communicates to Dash */
+
 #ifndef DASHAPP_CFG_H
 #define DASHAPP_CFG_H
 
