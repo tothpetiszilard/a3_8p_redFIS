@@ -19,5 +19,10 @@ menu "VWTP Configuration"
                 6C2 will be used, dont select this if you have modified RNS-E installed.
     endchoice # VWTP_DASH_TX_ID
 
+    config BENCH_TEST_MODE
+            bool "Enable BENCH test mode"
+            default "n"
+            help
+                Enables bench test mode, continously sends KL15 (ignition) "ON" to dash
 endmenu # "VWTP Configuration"
 

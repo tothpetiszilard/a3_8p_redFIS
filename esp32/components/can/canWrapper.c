@@ -18,20 +18,19 @@ void Can_Init(void)
     gcfg.intr_flags |= ESP_INTR_FLAG_IRAM;
     // Set up CAN ID filter
     fcfg.acceptance_code = (0x155u << 21u) | (0x200u << 5u);
-    #if (1 == CONFIG_VWTP_DASH_TX_ID_ALTERNATIVE)
-    // Accepted IDs are: 35F (stalk buttons), 575 (ignition), 6c3 (trans), 201 (engine), 300 (engine)
-    fcfg.acceptance_mask = 0xC55FB87Fu;
-    #elif( 1 == CONFIG_VWTP_DASH_TX_ID_NAVIGATION_RNSE)
-    // Accepted IDs are: 35F (stalk buttons), 575 (ignition), 6c1 (dash), 201 (engine), 300 (engine)
-    fcfg.acceptance_mask = 0xC55FB83Fu;
-    #endif
+    // Accepted IDs are: 35F (stalk buttons), 575 (ignition), 6c1 or 6c3 (dash), 201 (engine), 300 (engine), 207 (dash)
+    fcfg.acceptance_mask = 0xC55FB8FFu;
     fcfg.single_filter = false;
     twai_driver_install(&gcfg, &tcfg, &fcfg);
     twai_start();
     #ifndef REDFIS_SINGLE_THREAD
     xTaskCreatePinnedToCore(Can_Receive, "CanRx", 2048, NULL, 6, &CanTaskHdl,1);
     #endif
-    CAN_IGN_RXINDICATION(0u); // Go to sleep if no message received for 10 seconds
+    #if (1 == CONFIG_BENCH_TEST_MODE)
+    CAN_IGN_RXINDICATION(7u); // Ignition is always active on the test-bench
+    #elif 
+    CAN_IGN_RXINDICATION(0u); // Go to sleep if no message received for ~30 seconds
+    #endif
 }
 
 void Can_Receive(void *pvParameters)

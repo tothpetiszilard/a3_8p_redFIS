@@ -130,6 +130,10 @@ void VwTp_Cyclic(void *pvParameters)
 {
     uint8_t chId = 0;
     VwTp_ChannelType * chPtr = NULL;
+    #if (1 == CONFIG_BENCH_TEST_MODE)
+    const uint8_t ignition [4] = {7,20,0,0};
+    uint8_t callCounter = 0;
+    #endif
     #ifndef REDFIS_SINGLE_THREAD
     while(1)
     #endif
@@ -145,6 +149,17 @@ void VwTp_Cyclic(void *pvParameters)
             vTaskDelay((10u/(sizeof(vwtp_channels)/sizeof(vwtp_channels[0]))) / portTICK_PERIOD_MS);
             #endif
         }
+        #if (1 == CONFIG_BENCH_TEST_MODE)
+        if (callCounter >= 20)
+        {
+            VWTP_SENDMESSAGE(0x575, 4, (uint8_t *)ignition);
+            callCounter = 0;
+        }
+        else 
+        {
+            callCounter++;
+        }
+        #endif
     }
 }
 
