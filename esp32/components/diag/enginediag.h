@@ -1,11 +1,10 @@
+/* Emulation of Tester which communicates to Engine controller */
+
 #ifndef ENGINE_DIAG_H_
 #define ENGINE_DIAG_H_
 
 #include "stdint.h"
-
-#define ENGINEDIAG_OK       (0u)
-#define ENGINEDIAG_ERR      (1u)
-#define ENGINEDIAG_PENDING  (2u)
+#include "diagcore.h"
 
 typedef enum 
 {
@@ -27,11 +26,9 @@ typedef enum
     ENGINEDIAG_CH_MAX,
 }EngineDiag_ChannelIdType;
 
-typedef uint8_t EngineDiag_ReturnType;
+extern Diag_ReturnType EngineDiag_Init(void);
+#define EngineDiag_DeInit()    (Diag_DeInit())
 
-
-extern void EngineDiag_Init(void);
-extern void EngineDiag_Cyclic(void *pvParameters);
-extern EngineDiag_ReturnType EngineDiag_GetChData(const EngineDiag_ChannelIdType ch, uint8_t * dataPtr, uint32_t timeout);
+extern Diag_ReturnType EngineDiag_GetChData(const EngineDiag_ChannelIdType ch, uint8_t * dataPtr, uint32_t timeout);
 
 #endif //ENGINE_DIAG_H_
