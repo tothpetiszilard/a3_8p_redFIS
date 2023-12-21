@@ -5,9 +5,10 @@
 
 #include "stdint.h"
 
-#define DASHAPP_OK   (0u)
-#define DASHAPP_ERR  (1u)
-#define DASHAPP_BUSY (2u)
+#define DASHAPP_OK    (0u)
+#define DASHAPP_ERR   (1u)
+#define DASHAPP_BUSY  (2u)
+#define DASHAPP_PAUSE (3u)
 typedef uint8_t DashApp_ReturnType;
 
 typedef enum

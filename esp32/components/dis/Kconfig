@@ -1,0 +1,9 @@
+menu "Driver Information System Configuration"
+
+    config DIS_STALKBUTTON_RESET_EXIT_ENTER
+            bool "RESET button-press should deactivate (and reactivate) DIS screen"
+            default "n"
+            help
+                Enables RESET button handling on the stalk-buttons (may needed for alternative VWTP ID)
+endmenu # "DIS Configuration"
+

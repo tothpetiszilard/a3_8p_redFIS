@@ -146,7 +146,8 @@ void VwTp_Cyclic(void *pvParameters)
             VwTp_HandleCallbacks(chPtr);
             VwTp_HandleRxTimeout(chPtr);
             #ifndef REDFIS_SINGLE_THREAD
-            vTaskDelay((10u/(sizeof(vwtp_channels)/sizeof(vwtp_channels[0]))) / portTICK_PERIOD_MS);
+            //vTaskDelay((10u/(sizeof(vwtp_channels)/sizeof(vwtp_channels[0]))) / portTICK_PERIOD_MS);
+            vTaskDelay( 5u / portTICK_PERIOD_MS);
             #endif
         }
         #if (1 == CONFIG_BENCH_TEST_MODE)

@@ -3,6 +3,7 @@
 
 #include "stdint.h"
 #include "canWrapper.h"
+#include "sdkconfig.h"
 
 #define VWTP_TXBUFFERSIZE   (512)
 #define VWTP_RXBUFFERSIZE   (512)
@@ -66,6 +67,12 @@ typedef struct
     VwTp_ChannelCfgType cfg;
 }VwTp_ChannelType;
 
+#if ((1 == CONFIG_VWTP_DASH_TX_ID_ALTERNATIVE) && ( 1 == CONFIG_VWTP_DASH_TX_ID_NAVIGATION_RNSE))
+    #error "RNS-E and Alternative can not be selected in the same time!"
+#elif (1 == CONFIG_VWTP_DASH_TX_ID_ALTERNATIVE)
 extern VwTp_ChannelType vwtp_channels[2];
+#elif( 1 == CONFIG_VWTP_DASH_TX_ID_NAVIGATION_RNSE)
+extern VwTp_ChannelType vwtp_channels[3];
+#endif
 
 #endif //VWTP_20_CFG_H_

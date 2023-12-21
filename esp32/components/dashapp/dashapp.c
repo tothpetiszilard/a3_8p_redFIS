@@ -145,7 +145,7 @@ DashApp_ReturnType DashApp_GetStatus(void)
     }
     else if (DASHAPP_SUSPEND == appState)
     {
-        retVal = DASHAPP_BUSY;
+        retVal = DASHAPP_PAUSE;
     }
     else 
     {
@@ -452,7 +452,7 @@ static void DashApp_HandleReqStatus(uint8_t val)
     else if ((0x04 == val) || (0x84 == val))
     {
         // Request OK, busy, wait for 85
-        appState = DASHAPP_WAIT;
+        appState = DASHAPP_SUSPEND;
     }
     else if (0x85 == val)
     {

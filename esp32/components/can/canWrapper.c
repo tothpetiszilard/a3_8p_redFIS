@@ -16,9 +16,22 @@ void Can_Init(void)
     gcfg.tx_queue_len = 10;
     gcfg.rx_queue_len = 15;
     gcfg.intr_flags |= ESP_INTR_FLAG_IRAM;
-    // Set up CAN ID filter
+    // Set up CAN ID filters
+    // ---- First
+    //01101011111 35F (stalk buttons)
+    //10101110101 575 (ignition)
+    // Code: 00101010101 155
+    // Mask: 11000101010 62A
+    // ---- Second
+    //01000000001 201 (engine diag)
+    //01000000111 207 (dash diag)
+    //01100000000 300 (all diag)
+    //11011000001 6c1 (dash)
+    //11011000010 6c2 (navi, gw mode)
+    //11011000011 6c3 (dash, alternative mode)
+    // Code: 01000000000 200
+    // Mask: 10111000111 5c7
     fcfg.acceptance_code = (0x155u << 21u) | (0x200u << 5u);
-    // Accepted IDs are: 35F (stalk buttons), 575 (ignition), 6c1 or 6c3 (dash), 201 (engine), 300 (engine), 207 (dash)
     fcfg.acceptance_mask = 0xC55FB8FFu;
     fcfg.single_filter = false;
     twai_driver_install(&gcfg, &tcfg, &fcfg);
