@@ -168,12 +168,12 @@ VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len)
 {
     VwTp_ChannelType * chPtr = NULL;
     VwTp_ReturnType retVal = VWTP_ERR;
-    uint8_t i = 0;
+    uint16_t i = 0;
     if (chId < (sizeof(vwtp_channels)/sizeof(vwtp_channels[0])))
     {
         chPtr = &vwtp_channels[chId];
         vTaskSuspendAll(); // Critical section, interrupts enabled
-        if (chPtr->txState == VWTP_IDLE)
+        if ((chPtr->txState == VWTP_IDLE) && (sizeof(chPtr->txBuffer) >= len))
         {
             chPtr->txSize = len;
             chPtr->txOffset = 0u;
@@ -189,6 +189,7 @@ VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len)
             // Try to open channel
             chPtr->txFlags.params = VWTP_TPPARAMS_REQUEST;
             chPtr->rxState = VWTP_IDLE;
+            retVal = VWTP_PENDING;
         }
         else 
         {

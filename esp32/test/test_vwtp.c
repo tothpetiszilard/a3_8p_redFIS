@@ -1,4 +1,5 @@
 #include "unity.h"
+#include <stdlib.h>
 #define INC_FREERTOS_H
 #define INC_TASK_H
 #define portTICK_PERIOD_MS (1000u / 200u)
@@ -233,4 +234,111 @@ void test_VwTp_HandleTxTimeout_ResendData2(void)
     }
 }
 
+void test_VwTp_Send_OK(void)
+{
+    VwTp_ChannelType * chPtr= NULL;
+    VwTp_ReturnType retVal = VWTP_ERR;
+    uint8_t msgToSend[VWTP_TXBUFFERSIZE];
+    for (uint32_t i = 0;i < (sizeof(vwtp_channels)/sizeof(vwtp_channels[0]));i++ )
+    {
+        for(uint32_t cnt=0;cnt < sizeof(chPtr->txBuffer);cnt++)
+        {
+            chPtr = &vwtp_channels[i];
+            for(uint32_t s=0;s < cnt;s++)
+            {
+                msgToSend[s] = (uint8_t)rand();
+            }
+            chPtr->txSize = 0;
+            chPtr->txOffset = 255;
+            chPtr->txState = VWTP_IDLE;
+            retVal = VwTp_Send(i,msgToSend,cnt);
+            TEST_ASSERT_EQUAL(VWTP_OK, retVal);
+            TEST_ASSERT_EQUAL(cnt, chPtr->txSize);
+            TEST_ASSERT_EQUAL(0, chPtr->txOffset);
+            TEST_ASSERT_EQUAL(VWTP_WAIT, chPtr->txState);
+            for(uint32_t v=0;v < cnt;v++)
+            {
+                TEST_ASSERT_EQUAL(msgToSend[v], chPtr->txBuffer[v]);
+            }
+        }
+    }
+}
+
+void test_VwTp_Send_StateConnect(void)
+{
+    VwTp_ChannelType * chPtr = NULL;
+    VwTp_ReturnType retVal = VWTP_ERR;
+    uint8_t msgToSend[VWTP_TXBUFFERSIZE];
+    for (uint32_t i = 0;i < (sizeof(vwtp_channels)/sizeof(vwtp_channels[0]));i++ )
+    {
+        chPtr = &vwtp_channels[i];
+        chPtr->txSize = 0;
+        chPtr->txOffset = 0;
+        chPtr->txFlags.params = 0;
+        chPtr->txState = VWTP_CONNECT;
+        chPtr->rxState = VWTP_CONNECT;
+        retVal = VwTp_Send(i,msgToSend,0xAA);
+        if (VWTP_DIAG != chPtr->cfg.mode)
+        {
+            TEST_ASSERT_EQUAL(VWTP_PENDING, retVal);
+            TEST_ASSERT_EQUAL(VWTP_TPPARAMS_REQUEST, chPtr->txFlags.params);
+            TEST_ASSERT_EQUAL(0, chPtr->txSize);
+            TEST_ASSERT_EQUAL(0, chPtr->txOffset);
+            TEST_ASSERT_EQUAL(VWTP_CONNECT, chPtr->txState);
+            TEST_ASSERT_EQUAL(VWTP_IDLE, chPtr->rxState);
+        }
+        else
+        {
+            TEST_ASSERT_EQUAL(0, chPtr->txFlags.params);
+            TEST_ASSERT_EQUAL(0, chPtr->txSize);
+            TEST_ASSERT_EQUAL(0, chPtr->txOffset);
+            TEST_ASSERT_EQUAL(VWTP_CONNECT, chPtr->txState);
+            TEST_ASSERT_EQUAL(VWTP_CONNECT, chPtr->rxState);
+        }
+    }
+}
+
+void test_VwTp_Send_SizeError(void)
+{
+    VwTp_ChannelType * chPtr= NULL;
+    VwTp_ReturnType retVal = VWTP_ERR;
+    uint8_t msgToSend[VWTP_TXBUFFERSIZE];
+    for (uint32_t i = 0;i < (sizeof(vwtp_channels)/sizeof(vwtp_channels[0]));i++ )
+    {
+        for(uint32_t cnt = (1 + sizeof(chPtr->txBuffer));cnt < UINT16_MAX;cnt++)
+        {
+            chPtr = &vwtp_channels[i];
+            chPtr->txSize = 0;
+            chPtr->txOffset = 0x55;
+            chPtr->txState = VWTP_IDLE;
+            retVal = VwTp_Send(i,msgToSend,cnt);
+            TEST_ASSERT_EQUAL(VWTP_ERR, retVal);
+            TEST_ASSERT_EQUAL(0, chPtr->txSize);
+            TEST_ASSERT_EQUAL(0x55, chPtr->txOffset);
+            TEST_ASSERT_EQUAL(VWTP_IDLE, chPtr->txState);
+        }
+    }
+}
+
+void test_VwTp_Send_StateError(void)
+{
+    VwTp_ChannelType * chPtr= NULL;
+    VwTp_ReturnType retVal = VWTP_ERR;
+    uint8_t msgToSend[VWTP_TXBUFFERSIZE];
+    for (uint32_t i = 0;i < (sizeof(vwtp_channels)/sizeof(vwtp_channels[0]));i++ )
+    {
+        for(uint32_t cnt = (1 + sizeof(chPtr->txBuffer));cnt < UINT16_MAX;cnt++)
+        {
+            chPtr = &vwtp_channels[i];
+            chPtr->txSize = 25;
+            chPtr->txOffset = 0x55;
+            chPtr->txState = VWTP_WAIT;
+            retVal = VwTp_Send(i,msgToSend,cnt);
+            TEST_ASSERT_EQUAL(VWTP_ERR, retVal);
+            TEST_ASSERT_EQUAL(25, chPtr->txSize);
+            TEST_ASSERT_EQUAL(0x55, chPtr->txOffset);
+            TEST_ASSERT_EQUAL(VWTP_WAIT, chPtr->txState);
+        }
+    }
+}
 
