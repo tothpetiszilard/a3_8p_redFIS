@@ -1,0 +1,65 @@
+:project:
+  :build_root: build
+:paths:
+  :test:
+    - +:test/**
+    - -:test/support
+  :source:
+    - main/**
+    - components/**
+    - build/config/*
+    - /run/media/tothpetiszilard/Data/ESP32/esp-idf/components/freertos/FreeRTOS-Kernel/*
+    - /run/media/tothpetiszilard/Data/ESP32/esp-idf/components/freertos/FreeRTOS-Kernel/include/**
+    - /run/media/tothpetiszilard/Data/ESP32/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/**
+    - /run/media/tothpetiszilard/Data/ESP32/esp-idf/components/freertos/FreeRTOS-Kernel/portable/*
+    - /run/media/tothpetiszilard/Data/ESP32/esp-idf/components/freertos/FreeRTOS-Kernel/portable/priv_include/*
+    - /run/media/tothpetiszilard/Data/ESP32/esp-idf/components/freertos/esp_additions/**
+    - /run/media/tothpetiszilard/Data/ESP32/esp-idf/components/soc/esp32/include/**
+    - /run/media/tothpetiszilard/Data/ESP32/esp-idf/components/xtensa/**
+    - /run/media/tothpetiszilard/Data/ESP32/esp-idf/components/esp_hw_support/include/**
+    - /run/media/tothpetiszilard/Data/ESP32/esp-idf/components/esp_common/include/**
+    - /run/media/tothpetiszilard/Data/ESP32/esp-idf/components/esp_system/include/**
+    - /run/media/tothpetiszilard/Data/ESP32/esp-idf/components/esp_rom/include/**
+    - /run/media/tothpetiszilard/Data/ESP32/esp-idf/components/heap/include/**
+    - /run/media/tothpetiszilard/Data/ESP32/esp-idf/components/newlib/platform_include/**
+    - test/support/**
+#  :support:
+#    - test/support
+#  :libraries: []
+:defines:
+  # in order to add common defines:
+  #  1) remove the trailing [] from the :common: section
+  #  2) add entries to the :common: section (e.g. :test: has TEST defined)
+  :commmon: &common_defines
+#    - UNITY_INT_WIDTH=32
+#    - CMOCK_MEM_INDEX_TYPE=uint32_t
+#    - CMOCK_MEM_PTR_AS_INT=uint32_t
+#    - CMOCK_MEM_ALIGN=0
+#    - CMOCK_MEM_SIZE=2048
+    - CMOCK_MEM_STATIC
+  :test:
+    - *common_defines
+    - TEST
+  :test_preprocess:
+    - *common_defines
+    - TEST
+:cmock:
+  :mock_prefix: mock_
+  :when_no_prototypes: :warn
+  :enforce_strict_ordering: TRUE
+  :includes_h_pre_orig_header:
+    - ../<cmock_headers_includes>.h
+  :plugins:
+    - :ignore
+    - :ignore_arg
+    - :callback
+    - :expect
+    - :expect_any_args
+    - :return_thru_ptr
+  :treat_externs: :include
+  :treat_as:
+    uint8:    HEX8
+    uint16:   HEX16
+    uint32:   UINT32
+    int8:     INT8
+    bool:     UINT8
