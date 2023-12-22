@@ -4,6 +4,8 @@
 #include "stdint.h"
 #include "dashapp.h"
 #include "enginediag.h"
+#include "dashdiag.h"
+#include "sdkconfig.h"
 
 typedef struct
 {

@@ -5,6 +5,7 @@
 #include "canWrapper.h"
 #include "vwtp.h"
 #include "dashapp.h"
+#include "navapp.h"
 #include "dis.h"
 #include "enginediag.h"
 #include "kwp.h"
@@ -34,7 +35,8 @@ void app_main()
     Can_Init();
     VwTp_Init();
     DashApp_Init();
-    EngineDiag_Init();
+    NavApp_Init();
+    //EngineDiag_Init();
     Dis_Init();
     #ifdef REDFIS_SINGLE_THREAD
     esp_task_wdt_add(NULL);

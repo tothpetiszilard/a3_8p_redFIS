@@ -36,10 +36,18 @@ static uint8_t actualPage = 0;
 static uint8_t actualRow = 0;
 static DashApp_ContentType dspBuffer;
 static uint8_t diagBuffer[3u];
+#if (1 == CONFIG_DIS_STALKBUTTON_RESET_EXIT_ENTER)
 static uint8_t exited = 0;
+#endif
 
 void Dis_Init(void)
 {
+    
+    #if (1 == CONFIG_BENCH_TEST_MODE)
+    DashDiag_Init();
+    #else
+    EngineDiag_Init();
+    #endif
     #ifndef REDFIS_SINGLE_THREAD
     vTaskDelay(160u / portTICK_PERIOD_MS);
     
@@ -67,6 +75,7 @@ void Dis_Cyclic(void *pvParameters)
                 actualPage--;
                 actualRow = 0;
             }
+            #if (1 == CONFIG_DIS_STALKBUTTON_RESET_EXIT_ENTER)
             else if (STALKBUTTONS_RESET == buttons)
             {
                 if (0 == exited)
@@ -87,6 +96,7 @@ void Dis_Cyclic(void *pvParameters)
                 }
                 
             }
+            #endif
             else
             {
                 // Don't change the page 
@@ -130,7 +140,11 @@ static void HandleDisplay(const DisPageType * pagePtr)
             if (actualRow < (pagePtr->dataCnt))
             {
                 // Create strings from KWP data
-                if (ENGINEDIAG_OK == EngineDiag_GetChData(pagePtr->diagChs[actualRow].diagCh, diagBuffer, pagePtr->diagChs[actualRow].timeout))
+                #if (1 == CONFIG_BENCH_TEST_MODE)
+                if (DIAG_OK == DashDiag_GetChData(pagePtr->diagChs[actualRow].diagCh, diagBuffer, pagePtr->diagChs[actualRow].timeout))
+                #else
+                if (DIAG_OK == EngineDiag_GetChData(pagePtr->diagChs[actualRow].diagCh, diagBuffer, pagePtr->diagChs[actualRow].timeout))
+                #endif
                 {
                     Dis_CreateStrings(&dspBuffer,&pages[actualPage].data[actualRow],diagBuffer);
                     // Send values
@@ -164,21 +178,9 @@ static void HandleDisplay(const DisPageType * pagePtr)
 
 static void Dis_CreateStrings(DashApp_ContentType * out, const DashApp_ContentType * const row, uint8_t * data)
 {
-    //int16_t val_s16 = 0;
-
     out->ft = row->ft;
     out->posX = row->posX;
     out->posY = row->posY;
     out->mode = row->mode;
-    /*if (data[0] == 5)
-    {
-        val_s16 = data[1] * (data[2] - 100);
-        val_s16 /= 10;
-        out->len = snprintf(out->string, sizeof(out->string),row->string ,val_s16 );
-    }
-    else 
-    {
-        out->len = snprintf(out->string, sizeof(out->string),"---" );
-    }*/
     out->len = Dis_DecodeFrame(out->string,data);
 }
