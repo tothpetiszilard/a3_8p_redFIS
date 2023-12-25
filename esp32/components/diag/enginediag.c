@@ -55,7 +55,7 @@ static void EngineDiag_HandleDid(uint8_t * buffer, uint8_t actualDid);
 
 Diag_ReturnType EngineDiag_Init(void)
 {
-    return Diag_Init(0x11u, EngineDiag_HandleDid);
+    return Diag_Init(0x01u, EngineDiag_HandleDid);
 }
 
 

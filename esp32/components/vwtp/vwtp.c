@@ -400,7 +400,10 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
     else if (0xA8u == dataPtr[0])
     {
         // Connection was terminated
-        VwTp_sendClose(chPtr);
+        if (VWTP_CONNECT != chPtr->txState)
+        {
+            VwTp_sendClose(chPtr);
+        }
     }
     else if (0xA4u == dataPtr[0])
     {

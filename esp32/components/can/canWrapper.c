@@ -41,7 +41,7 @@ void Can_Init(void)
     #endif
     #if (1 == CONFIG_BENCH_TEST_MODE)
     CAN_IGN_RXINDICATION(7u); // Ignition is always active on the test-bench
-    #elif 
+    #else
     CAN_IGN_RXINDICATION(0u); // Go to sleep if no message received for ~30 seconds
     #endif
 }

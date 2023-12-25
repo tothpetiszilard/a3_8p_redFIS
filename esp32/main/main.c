@@ -36,7 +36,6 @@ void app_main()
     VwTp_Init();
     DashApp_Init();
     NavApp_Init();
-    //EngineDiag_Init();
     Dis_Init();
     #ifdef REDFIS_SINGLE_THREAD
     esp_task_wdt_add(NULL);
