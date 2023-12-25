@@ -15,8 +15,8 @@ extern void NavApp_Init(void);
 extern void NavApp_Cyclic(void *pvParameters);
 
 extern NavApp_ReturnType NavApp_GetStatus(void);
-extern NavApp_ReturnType NavApp_Enter(void);
-extern NavApp_ReturnType NavApp_Exit(void);
+extern NavApp_ReturnType NavApp_Pause(void);
+extern NavApp_ReturnType NavApp_Continue(void);
 
 extern void NavApp_Receive(uint8_t * dataPtr,uint16_t len);
 extern void NavApp_TxConfirmation(uint8_t result);

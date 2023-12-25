@@ -3,6 +3,7 @@
 
 #include "stdint.h"
 #include "dashapp.h"
+#include "navapp.h"
 #include "enginediag.h"
 #include "dashdiag.h"
 #include "sdkconfig.h"

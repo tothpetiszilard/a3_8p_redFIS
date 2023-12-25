@@ -15,7 +15,7 @@ https://www.urotuning.com/products/polar-fis-advanced-multi-function-display-pf-
 Selectable in "menuconfig":
 - You can use Alternative VWTP CANID if you have RNS-E (Audi navigation with color display) installed and your dashboards part number is "8P0 920 930". Don't select "FIS-Control" in your RNS-E custom firmware in this case. Enter/exit FIS scenarios are a bit buggy.
 
-- You have to use Navigation VWTP CANID if you have dashboard with part number "8P0 920 931". Alternative CANID is not supported by the dash. You may select "FIS-Control" in your RNS-E custom firmware in this case, but handling this is not yet implemented.
+- You have to use Navigation VWTP CANID if you have dashboard with part number "8P0 920 931". Alternative CANID is not supported by the dash. You may select "FIS-Control" in your RNS-E custom firmware in this case, and this code (v0_2) will do the routing of the display data from RNS-E to the Dash if that "page" is selected using the Up/Down stalk buttons. (still beta)
 
 <i>Brave volunteers are warmly welcomed for testing... :)</i>
 

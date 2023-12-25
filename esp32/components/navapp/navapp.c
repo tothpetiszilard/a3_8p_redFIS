@@ -16,11 +16,8 @@ typedef enum
     NAVAPP_PAGEREQ=3,
     NAVAPP_STATUS=4,
     NAVAPP_SEND2E=5,
-    NAVAPP_PREWRITE=6,
-    NAVAPP_SHOW=7,
-    NAVAPP_WRITE=8,
-    NAVAPP_READY=9,
-    NAVAPP_CLEAR = 10,
+    NAVAPP_WRITE=6,
+    NAVAPP_READY=7,
     NAVAPP_WAIT,
     NAVAPP_SUSPEND,
     NAVAPP_SHUTDOWN
@@ -33,6 +30,8 @@ static uint8_t retryCnt = 0;
 static uint8_t reqPageId = 0;
 static uint8_t reqResp = 0xC0;
 static TaskHandle_t NavAppTaskHdl = NULL;
+static uint8_t routingBuffer[48];
+static uint8_t routingBufferLen = 0;
 
 // Rx
 static void NavApp_HandlePwrReport(uint8_t val);
@@ -55,6 +54,9 @@ void NavApp_Init(void)
     appState = NAVAPP_INIT;
     waitForAck = 0;
     retryCnt = 0;
+    reqResp = 0xC0;
+    reqPageId = 0;
+    routingBufferLen = 0;
     #ifndef REDFIS_SINGLE_THREAD
     vTaskDelay(100 / portTICK_PERIOD_MS);
     xTaskCreatePinnedToCore(NavApp_Cyclic, "NavApp", 2560u, NULL, 4, &NavAppTaskHdl,1);
@@ -101,7 +103,14 @@ void NavApp_Cyclic(void *pvParameters)
                     NavApp_Send2E();
                     break;
                     case NAVAPP_WRITE:
-                    // TODO : Get buffer to route into?
+                    // Routing from buffer in case VWTP was not ready when we received data
+                    if (routingBufferLen != 0)
+                    {
+                        if (VWTP_OK == NAVAPP_DASHAPP_SENDTP(routingBuffer,routingBufferLen))
+                        {
+                            routingBufferLen = 0;
+                        }
+                    }
                     break;
                     default:
                     break;
@@ -121,6 +130,34 @@ void NavApp_Cyclic(void *pvParameters)
         vTaskDelay(30 / portTICK_PERIOD_MS);
         #endif
     }
+}
+
+NavApp_ReturnType NavApp_Pause(void)
+{
+    NavApp_ReturnType retVal = NAVAPP_ERR;
+    if ((NAVAPP_READY == appState) || (NAVAPP_WRITE == appState))
+    {
+        // Send framem only if necessary
+        if (0x84 != reqResp)
+        {
+            reqResp = 0x84; // Busy, do not send
+            appState = NAVAPP_STATUS;
+        }
+        retVal = NAVAPP_OK;
+    }
+    return retVal;
+}
+
+NavApp_ReturnType NavApp_Continue(void)
+{
+    NavApp_ReturnType retVal = NAVAPP_ERR;
+    if (NAVAPP_SUSPEND == appState)
+    {
+        reqResp = 0x85; // ready, clear to send
+        appState = NAVAPP_STATUS;
+        retVal = NAVAPP_OK;
+    }
+    return retVal;
 }
 
 NavApp_ReturnType NavApp_GetStatus(void)
@@ -163,6 +200,7 @@ void NavApp_TxConfirmation(uint8_t result)
 
 void NavApp_Receive(uint8_t * dataPtr,uint16_t len)
 {
+    uint8_t cpyCnt = 0;
     switch(dataPtr[0])
     {
         case NAVAPP_CMD_PWRREPORT:
@@ -178,17 +216,30 @@ void NavApp_Receive(uint8_t * dataPtr,uint16_t len)
         break;
         case NAVAPP_CMD_2F_RESP:
         // response from nav, followed by data
-        appState = NAVAPP_WRITE;
+        appState = NAVAPP_READY;
         break;
         case NAVAPP_CMD_REQAREA:
-        NavApp_HandleReqArea(&dataPtr[1]);
-        break;
+        if (NAVAPP_WRITE != appState)
+        {
+            NavApp_HandleReqArea(&dataPtr[1]);
+            break;
+        }
         case NAVAPP_CMD_WRITE:
-        // Data received to be shown, drop it for now...
-        break;
-        case NAVAPP_SHOW:
-        case NAVAPP_CLEAR:
-        // Show/Clear command received, do nothing for now
+        case NAVAPP_CMD_SHOW:
+        case NAVAPP_CMD_CLEAR:
+        // Data received to be shown, route it if possible
+        // Show/Clear command received, route it if possible
+        if ((NAVAPP_WRITE == appState) && (routingBufferLen == 0))
+        {
+            if ((VWTP_OK != NAVAPP_DASHAPP_SENDTP(dataPtr,len)) && (len < sizeof(routingBuffer)))
+            {
+                for (cpyCnt=0; cpyCnt < len; cpyCnt++)
+                {
+                    routingBuffer[cpyCnt] = dataPtr[cpyCnt];
+                }
+                routingBufferLen = len;
+            }
+        }
         break;
         case NAVAPP_CMD_ERR:
         NAVAPP_DISCONNECT();
@@ -205,35 +256,42 @@ static void NavApp_HandleReqArea(uint8_t * request)
 {
     if (0 != (request[1] & 0x80))
     {
-        if (NAVAPP_WRITE != appState)
+        if (NAVAPP_STATUS != appState)
         {
-            reqResp = 0x05; // Preparation, wait for 2E
-            appState = NAVAPP_STATUS;
-        }
-        else 
-        {
-            reqResp = 0x85; // Ready, clear to send
+            if (NAVAPP_READY != appState)
+            {
+                reqResp = 0x05; // Preparation, wait for 2E
+                appState = NAVAPP_STATUS;
+            }
+            else 
+            {
+                reqResp = 0x84; // Busy, wait for 0x85
+                appState = NAVAPP_STATUS;
+            }
         }
     }
     else 
     {
-        appState = NAVAPP_WAIT;
+        if ((NAVAPP_READY == appState) && (0x85 == reqResp))
+        {
+            appState = NAVAPP_WRITE;
+        }
+        else 
+        {
+            appState = NAVAPP_WAIT;
+        }
     }
 }
 
 static void NavApp_SendPwrState(void)
 {
-    uint8_t msg[3];
+    uint8_t msg[2];
     msg[0] = NAVAPP_CMD_PWRSTATE;
     msg[1] = ignitionState;
-    msg[2] = 0; // ??? 
     if (VWTP_OK == NAVAPP_SENDTP(msg,sizeof(msg)))
     {
         waitForAck = 1u;
-        if (NAVAPP_KEY_OFF != ignitionState)
-        {
-            appState = NAVAPP_WAIT;
-        }
+        appState = NAVAPP_WAIT;
         
     }
     else 
@@ -294,14 +352,22 @@ static void NavApp_ReqAreaResponse()
     if (VWTP_OK == NAVAPP_SENDTP(msg,sizeof(msg)))
     {
         waitForAck = 1u;
-        if (reqResp == 5)
+        if (reqResp == 0x05)
         {
             appState = NAVAPP_SEND2E;
+        }
+        else if (reqResp == 0x84)
+        {
+            appState = NAVAPP_SUSPEND;
+        }
+        else if (reqResp == 0x85)
+        {
+            appState = NAVAPP_WRITE;
         }
         else
         {
             appState = NAVAPP_WAIT;
-        }     
+        }
     }
 }
 
@@ -316,37 +382,9 @@ static void NavApp_Send2E(void)
     }
 }
 
-static void NavApp_HandleWrite(void)
-{
-    
-}
-
-static void NavApp_Show(void)
-{
-    uint8_t msg[1];
-    msg[0] = NAVAPP_CMD_SHOW;
-    if (VWTP_OK == NAVAPP_SENDTP(msg,sizeof(msg)))
-    {
-        waitForAck = 1u;
-        appState = NAVAPP_READY;
-    }
-}
-
-static void NavApp_Clear(void)
-{
-    uint8_t msg[1];
-    msg[0] = NAVAPP_CMD_CLEAR;
-    if (VWTP_OK == NAVAPP_SENDTP(msg,sizeof(msg)))
-    {
-        waitForAck = 1u;
-        appState = NAVAPP_SUSPEND;
-    }
-}
-
 static void NavApp_HandlePwrReport(uint8_t val)
 {
-    ignitionState = val;
-    appState = NAVAPP_PWRSTATE;
+
 }
 
 static void NavApp_HandleReqMfaPage(uint8_t * val)

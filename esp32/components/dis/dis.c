@@ -58,14 +58,20 @@ void Dis_Init(void)
 void Dis_Cyclic(void *pvParameters)
 {
     const DisPageType * pagePtr = NULL;
+    DashApp_ReturnType dashStatus;
     #ifndef REDFIS_SINGLE_THREAD
     while(1)
     #endif
     {
         buttons = StalkButtons_Get();
-        if (DASHAPP_ERR != DashApp_GetStatus())
+        dashStatus = DashApp_GetStatus();
+        if (DASHAPP_ERR != dashStatus)
         {
-            if ((STALKBUTTONS_UP == buttons) && ((sizeof(pages)/sizeof(pages[0]) > actualPage)))
+            if ((DASHAPP_PAUSE == dashStatus) || ((sizeof(pages)/sizeof(pages[0]) > actualPage)))
+            {
+                (void)NavApp_Pause();
+            }
+            if ((STALKBUTTONS_UP == buttons) && ((1u + (sizeof(pages)/sizeof(pages[0])) > actualPage)))
             {
                 actualPage++;
                 actualRow = 0;
@@ -102,8 +108,20 @@ void Dis_Cyclic(void *pvParameters)
                 // Don't change the page 
             }
         }
-        pagePtr = &pages[actualPage];
-        HandleDisplay(pagePtr);
+        else 
+        {
+            // Dashboard is not available, report it to Nav also
+            (void)NavApp_Pause();
+        }
+        if (actualPage < (sizeof(pages)/sizeof(pages[0])))
+        {
+            pagePtr = &pages[actualPage];
+            HandleDisplay(pagePtr);
+        }
+        else if (DASHAPP_OK == dashStatus)
+        {
+            (void)NavApp_Continue();
+        }
         #ifndef REDFIS_SINGLE_THREAD
         vTaskDelay(300 / portTICK_PERIOD_MS);
         #endif
