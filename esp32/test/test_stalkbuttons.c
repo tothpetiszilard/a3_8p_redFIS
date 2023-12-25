@@ -4,8 +4,8 @@
 
 #include "stalkButtons.c"
 
-#define BUTTON_UP   (0x10u)
-#define BUTTON_DOWN   (0x20u)
+#define BUTTON_UP   (0x20u)
+#define BUTTON_DOWN   (0x10u)
 #define BUTTON_RESET   (0x40u)
 
 
@@ -40,7 +40,7 @@ void test_StalkButtons_Receive_DOWN(void)
     TEST_ASSERT_EQUAL(BUTTON_DOWN, lastButtons);
     StalkButtons_Receive(0);
     TEST_ASSERT_EQUAL(STALKBUTTONS_DOWN, events);
-    TEST_ASSERT_EQUAL(0, lastButtons);
+    TEST_ASSERT_EQUAL(0, lastButtons);   
 }
 
 void test_StalkButtons_Receive_RESET(void)

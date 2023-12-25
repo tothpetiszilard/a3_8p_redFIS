@@ -16,12 +16,12 @@ void StalkButtons_Receive(uint8_t buttons)
 {
     if (lastButtons != buttons)
     {
-        if ((0 != (lastButtons & 0x10u)) && (0 == (buttons & 0x10u)))
+        if ((0 != (lastButtons & 0x20u)) && (0 == (buttons & 0x20u)))
         {
             // UP was pressed and now released
             events |= STALKBUTTONS_UP;
         }
-        else if ((0 != (lastButtons & 0x20u)) && (0 == (buttons & 0x20u)))
+        else if ((0 != (lastButtons & 0x10u)) && (0 == (buttons & 0x10u)))
         {
             // DOWN was pressed and now released
             events |= STALKBUTTONS_DOWN;
