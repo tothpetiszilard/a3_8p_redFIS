@@ -28,9 +28,9 @@ const DiagIdType pageDiag[1][3] =
             #if (1 == CONFIG_BENCH_TEST_MODE)
             .diagCh = DASHDIAG_CH_FUELLEVEL1,
             #else
-            .diagCh = ENGINEDIAG_CH_FUELTEMP, // did7
+            .diagCh = ENGINEDIAG_CH_EGTEMP74, // did74
             #endif
-            .timeout = 10000
+            .timeout = 6000
         }
         
     }
@@ -103,8 +103,8 @@ const DashApp_ContentType pageLabels[1][3] =
             .mode = DASHAPP_ADD,
             .posX = 1u,
             .posY = 31u,
-            .string = "Fuel:",
-            .len = 5u,
+            .string = "EGT:",
+            .len = 4u,
             .ft = DASHAPP_FONT_S
         }
     }

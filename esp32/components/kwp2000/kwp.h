@@ -17,7 +17,7 @@ extern void Kwp_Cyclic(void *pvParameters);
 extern Kwp_ReturnType Kwp_RequestData(uint8_t did);
 extern Kwp_ReturnType Kwp_GetDataFromECU(uint8_t * const dataPtr);
 
-extern void Kwp_Receive(uint8_t * dataPtr,uint16_t len);
+extern uint8_t Kwp_Receive(uint8_t * dataPtr,uint16_t len);
 extern void Kwp_TxConfirmation(uint8_t result);
 
 #endif //KWP2000_H_

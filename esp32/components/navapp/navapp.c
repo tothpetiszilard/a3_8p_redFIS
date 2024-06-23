@@ -30,7 +30,7 @@ static uint8_t retryCnt = 0;
 static uint8_t reqPageId = 0;
 static uint8_t reqResp = 0xC0;
 static TaskHandle_t NavAppTaskHdl = NULL;
-static uint8_t routingBuffer[48];
+static uint8_t routingBuffer[256];
 static uint8_t routingBufferLen = 0;
 
 // Rx
@@ -187,6 +187,11 @@ void NavApp_TxConfirmation(uint8_t result)
     if (VWTP_OK == result)
     {
         waitForAck = 0;
+        if ((NAVAPP_WRITE == appState) && (0u == routingBufferLen))
+        {
+            // Messages are successfully routed, continue data stream
+            NAVAPP_READYCALLBACK();
+        }
     }
     else if (VWTP_ERR == result)
     {
@@ -198,8 +203,9 @@ void NavApp_TxConfirmation(uint8_t result)
     }
 }
 
-void NavApp_Receive(uint8_t * dataPtr,uint16_t len)
+uint8_t NavApp_Receive(uint8_t * dataPtr,uint16_t len)
 {
+    VwTp_ReturnType retVal = VWTP_OK;
     uint8_t cpyCnt = 0;
     switch(dataPtr[0])
     {
@@ -238,7 +244,13 @@ void NavApp_Receive(uint8_t * dataPtr,uint16_t len)
                     routingBuffer[cpyCnt] = dataPtr[cpyCnt];
                 }
                 routingBufferLen = len;
+                retVal = VWTP_ERR;
             }
+        }
+        // New data received while buffer is still not empty, error case
+        else 
+        {
+            retVal = VWTP_ERR;
         }
         break;
         case NAVAPP_CMD_ERR:
@@ -249,6 +261,7 @@ void NavApp_Receive(uint8_t * dataPtr,uint16_t len)
         default:
         break;
     }
+    return retVal;
 }
 
 

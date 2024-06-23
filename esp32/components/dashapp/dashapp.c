@@ -235,7 +235,7 @@ void DashApp_TxConfirmation(uint8_t result)
     }
 }
 
-void DashApp_Receive(uint8_t * dataPtr,uint16_t len)
+uint8_t DashApp_Receive(uint8_t * dataPtr,uint16_t len)
 {
     switch(dataPtr[0])
     {
@@ -267,6 +267,7 @@ void DashApp_Receive(uint8_t * dataPtr,uint16_t len)
         default:
         break;
     }
+    return VWTP_OK;
 }
 
 static void DashApp_InitDisplay(void)

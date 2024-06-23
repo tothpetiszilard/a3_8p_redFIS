@@ -243,7 +243,7 @@ void Kwp_Cyclic(void *pvParameters)
     }
 }
 
-void Kwp_Receive(uint8_t * dataPtr,uint16_t len)
+uint8_t Kwp_Receive(uint8_t * dataPtr,uint16_t len)
 {
     uint8_t i = 0;
     if (KWP_WAITRESULT == commandStatus)
@@ -287,6 +287,7 @@ void Kwp_Receive(uint8_t * dataPtr,uint16_t len)
             xTaskResumeAll(); // End of critical section, interrupts enabled
         }
     }
+    return VWTP_OK;
 }
 
 void Kwp_TxConfirmation(uint8_t result)

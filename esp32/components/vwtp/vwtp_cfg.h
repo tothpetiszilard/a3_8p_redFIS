@@ -5,14 +5,17 @@
 #include "canWrapper.h"
 #include "sdkconfig.h"
 
-#define VWTP_TXBUFFERSIZE   (512)
-#define VWTP_RXBUFFERSIZE   (512)
+#define VWTP_TXBUFFERSIZE        (256)
+#define VWTP_RXBUFFERSIZE        (256)
 
 #define VWTP_SENDMESSAGE(id,len,dataPtr)      (Can_Write(id,len,dataPtr))
 
-#define VWTP_TPPARAMS_MASK      (1u)
-#define VWTP_TPPARAMS_REQUEST   (2u)
-#define VWTP_TPPARAMS_RESPONSE  (3u)
+#define VWTP_TPPARAMS_MASK       (1u)
+#define VWTP_TPPARAMS_REQUEST    (2u)
+#define VWTP_TPPARAMS_RESPONSE   (3u)
+
+#define VWTP_TXTASK_ACK_READY    (1u)
+#define VWTP_TXTASK_ACK_NOTREADY (2u)
 
 typedef enum
 {
@@ -29,9 +32,15 @@ typedef enum
     VWTP_NONDIAG
 }VwTp_ModeType;
 
+typedef enum
+{
+    VWTP_APP_READY = 0u,
+    VWTP_APP_BUSY
+}VwTp_AppState;
+
 typedef struct
 {
-    uint8_t ack : 1;
+    uint8_t ack : 2; // 1 = ack, ready 2 = ack, not ready
     uint8_t params :2; // 2 = req, 3 = resp
     uint8_t brk :1;
 } VwTp_TxTasks;
@@ -44,7 +53,7 @@ typedef struct
     uint8_t ackTimeout; // time until wait for ack
     uint8_t ips; // inter-packet-space, time between two TP frames
     VwTp_ModeType mode;
-    void (*rxIndication)(uint8_t *data,uint16_t len); //callback: Data rx
+    uint8_t (*rxIndication)(uint8_t *data,uint16_t len); //callback: Data rx
     void (*txConfirmation)(uint8_t result); //callback: Data sent
 }VwTp_ChannelCfgType;
 
@@ -61,6 +70,7 @@ typedef struct
     uint16_t rxSize;
     uint16_t txSize;
     uint16_t txOffset;
+    VwTp_AppState appState;
     VwTp_StatesType txState;
     VwTp_StatesType rxState;
     VwTp_TxTasks txFlags;

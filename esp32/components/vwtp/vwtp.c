@@ -19,6 +19,7 @@ static void VwTp_HandleCallbacks(VwTp_ChannelType * const chPtr);
 static void VwTp_sendTpParams(VwTp_ChannelType * const chPtr, uint8_t response);
 static void VwTp_sendClose(VwTp_ChannelType * const chPtr);
 static void VwTp_sendAck(VwTp_ChannelType * const chPtr);
+static void VwTp_sendAckNotReady(VwTp_ChannelType * const chPtr);
 static void VwTp_sendBreak(VwTp_ChannelType * const chPtr);
 
 
@@ -30,6 +31,7 @@ void VwTp_Init(void)
         vwtp_channels[i].txState = VWTP_CONNECT;
         vwtp_channels[i].rxState = VWTP_CONNECT;
         vwtp_channels[i].seqCntRx = 0xFu; // 0 is expected in the first frame
+        vwtp_channels[i].appState = VWTP_APP_READY;
     }
     #ifndef REDFIS_SINGLE_THREAD
     xTaskCreatePinnedToCore(VwTp_Cyclic, "VwTp", 2048u, NULL, 5, &VwTpTaskHdl,1);
@@ -225,6 +227,37 @@ void VwTp_Receive(uint16_t canId, uint8_t dlc, uint8_t * dataPtr)
     }
 }
 
+VwTp_ReturnType VwTp_RxReady_Cb(uint8_t chId)
+{
+    VwTp_ChannelType * chPtr = NULL;
+    VwTp_ReturnType retVal = VWTP_ERR;
+    if (chId < (sizeof(vwtp_channels)/sizeof(vwtp_channels[0])))
+    {
+        chPtr = &vwtp_channels[chId];
+        if ((VWTP_ACK == chPtr->rxState) && (0 == chPtr->txFlags.ack))
+        {
+            // We sent a not ready ack and now we are ready to continue
+            chPtr->appState = VWTP_APP_READY;
+            // Let's send another ack, but now with ready state indication
+            chPtr->txFlags.ack = VWTP_TXTASK_ACK_READY;
+            // main fct will soon send it out and we will get an rx indication with the next packet
+            retVal = VWTP_OK;
+        }
+        else if ((VWTP_ACK == chPtr->rxState) && (VWTP_TXTASK_ACK_READY != chPtr->txFlags.ack))
+        {
+            // We planned to send a "not ready ack" but from now we are ready
+            chPtr->appState = VWTP_APP_READY;
+            chPtr->txFlags.ack = VWTP_TXTASK_ACK_READY; // Overwrite it
+            retVal = VWTP_OK;
+        }
+        else 
+        {
+            // Nothing to do here
+        }
+    }
+    return retVal;
+}
+
 static void VwTp_HandleRxTimeout(VwTp_ChannelType * const chPtr)
 {
     if (VWTP_WAIT == chPtr->rxState)
@@ -306,7 +339,15 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
                 {
                     chPtr->rxBuffer[i] = dataPtr[i+1];
                 }
-                chPtr->txFlags.ack = 1u; // Ack + rxIndication
+                if (VWTP_APP_READY == chPtr->appState)
+                {
+                    chPtr->txFlags.ack = VWTP_TXTASK_ACK_READY; // Ack + rxIndication
+                }
+                else 
+                {
+                    chPtr->txFlags.ack = VWTP_TXTASK_ACK_NOTREADY; // Ack, not ready
+                }
+                
                 chPtr->rxState = VWTP_ACK;
             }
             else if (VWTP_WAIT == chPtr->rxState )
@@ -317,7 +358,14 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
                     chPtr->rxBuffer[chPtr->rxSize + i] = dataPtr[i+1];
                 }
                 chPtr->rxSize += (dlc-1);
-                chPtr->txFlags.ack = 1u; // Ack + rxIndication
+                if (VWTP_APP_READY == chPtr->appState)
+                {
+                    chPtr->txFlags.ack = VWTP_TXTASK_ACK_READY; // Ack + rxIndication
+                }
+                else 
+                {
+                    chPtr->txFlags.ack = VWTP_TXTASK_ACK_NOTREADY; // Ack, not ready
+                }
                 chPtr->rxState = VWTP_ACK;
             }
             else 
@@ -356,7 +404,7 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
                 chPtr->rxSize += (dlc-1);
                 if (0 == (dataPtr[0] & 0xF0u))
                 {
-                    chPtr->txFlags.ack = 1u; // Ack + rxIndication
+                    chPtr->txFlags.ack = VWTP_TXTASK_ACK_READY; // Ack + rxIndication
                 }
             }
             else 
@@ -443,7 +491,7 @@ static void VwTp_sendAck(VwTp_ChannelType * const chPtr)
     uint8_t msg[1];
     uint8_t ackSeq;
     ackSeq = (chPtr->seqCntRx+1) & 0x0Fu;
-    msg[0] = 0xB0u | ackSeq; // ack
+    msg[0] = 0xB0u | ackSeq; // ack, ready
     if (CAN_OK == VWTP_SENDMESSAGE(chPtr->cfg.txId,sizeof(msg),msg))
     {
         vTaskSuspendAll(); // Critical section, interrupts enabled
@@ -451,6 +499,21 @@ static void VwTp_sendAck(VwTp_ChannelType * const chPtr)
         chPtr->txFlags.ack = 0u;
         // reset states to receive the next msg
         chPtr->rxState = VWTP_FINISHED;
+        xTaskResumeAll(); // End of critical section, interrupts enabled
+    }
+}
+
+static void VwTp_sendAckNotReady(VwTp_ChannelType * const chPtr)
+{
+    uint8_t msg[1];
+    uint8_t ackSeq;
+    ackSeq = (chPtr->seqCntRx+1) & 0x0Fu;
+    msg[0] = 0x90u | ackSeq; // ack, not ready
+    if (CAN_OK == VWTP_SENDMESSAGE(chPtr->cfg.txId,sizeof(msg),msg))
+    {
+        vTaskSuspendAll(); // Critical section, interrupts enabled
+        chPtr->txFlags.ack = 0u;
+        // leave state in ACK, we need to send another ack to continue
         xTaskResumeAll(); // End of critical section, interrupts enabled
     }
 }
@@ -521,7 +584,16 @@ static void VwTp_HandleCallbacks(VwTp_ChannelType * const chPtr)
     {
         if (NULL != chPtr->cfg.rxIndication)
         {
-            chPtr->cfg.rxIndication(chPtr->rxBuffer,chPtr->rxSize);
+            if (VWTP_OK == chPtr->cfg.rxIndication(chPtr->rxBuffer,chPtr->rxSize))
+            {
+                // We can send an ACK (ready) and call the rxIndication immediatelly
+                chPtr->appState = VWTP_APP_READY;
+            }
+            else 
+            {
+                // APP needs time to process the request, ACK not ready is nededed in case of a new packet received
+                chPtr->appState = VWTP_APP_BUSY;
+            }
         }
         vTaskSuspendAll(); // Critical section, interrupts enabled
         chPtr->rxSize = 0u;
@@ -593,7 +665,14 @@ static void VwTp_HandleTx(VwTp_ChannelType * const chPtr)
     }
     else if ((VWTP_IDLE == chPtr->txState) && (0 != chPtr->txFlags.ack))
     {
-        VwTp_sendAck(chPtr);
+        if (VWTP_TXTASK_ACK_READY == chPtr->txFlags.ack)
+        {
+            VwTp_sendAck(chPtr);
+        }
+        else
+        {
+            VwTp_sendAckNotReady(chPtr);
+        }
     }
     else if ((VWTP_IDLE == chPtr->txState) && (0 != chPtr->txFlags.brk))
     {
