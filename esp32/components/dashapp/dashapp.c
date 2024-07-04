@@ -219,6 +219,20 @@ DashApp_ReturnType DashApp_Print(const DashApp_ContentType * const content)
     return retVal;
 }
 
+DashApp_ReturnType DashApp_ClearScreen(void)
+{
+    DashApp_ReturnType retVal = DASHAPP_ERR;
+    if (DASHAPP_READY == appState)
+    {
+        vTaskSuspendAll(); // Critical section, interrupts enabled
+        dspContent.len = 0;
+        appState = DASHAPP_PREWRITE;
+        xTaskResumeAll(); // End of critical section, interrupts enabled
+        retVal = DASHAPP_OK;
+    }
+    return retVal;
+}
+
 void DashApp_TxConfirmation(uint8_t result)
 {
     if (VWTP_OK == result)

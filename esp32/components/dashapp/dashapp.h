@@ -39,6 +39,7 @@ extern void DashApp_Cyclic(void *pvParameters);
 extern DashApp_ReturnType DashApp_GetStatus(void);
 extern DashApp_ReturnType DashApp_Enter(void);
 extern DashApp_ReturnType DashApp_Exit(void);
+extern DashApp_ReturnType DashApp_ClearScreen(void);
 extern DashApp_ReturnType DashApp_Print(const DashApp_ContentType * const content);
 
 extern uint8_t DashApp_Receive(uint8_t * dataPtr,uint16_t len);

@@ -57,6 +57,8 @@ void Dis_Init(void)
 
 void Dis_Cyclic(void *pvParameters)
 {
+    static uint8_t wasRoutingActive = 0;
+    uint8_t isRoutingActive = 0;
     const DisPageType * pagePtr = NULL;
     DashApp_ReturnType dashStatus;
     #ifndef REDFIS_SINGLE_THREAD
@@ -67,9 +69,17 @@ void Dis_Cyclic(void *pvParameters)
         dashStatus = DashApp_GetStatus();
         if (DASHAPP_ERR != dashStatus)
         {
-            if ((DASHAPP_PAUSE == dashStatus) || ((sizeof(pages)/sizeof(pages[0]) > actualPage)))
+            if ((DASHAPP_PAUSE == dashStatus) && (0 != isRoutingActive))
             {
-                (void)NavApp_Pause();
+                isRoutingActive = 0;
+                if (isRoutingActive != wasRoutingActive)
+                {
+                    if (NAVAPP_OK == NavApp_Pause())
+                    {
+                        wasRoutingActive = isRoutingActive;
+                    }
+                }
+                
             }
             if ((STALKBUTTONS_UP == buttons) && ((1u + (sizeof(pages)/sizeof(pages[0])) > actualPage)))
             {
@@ -115,12 +125,30 @@ void Dis_Cyclic(void *pvParameters)
         }
         if (actualPage < (sizeof(pages)/sizeof(pages[0])))
         {
-            pagePtr = &pages[actualPage];
-            HandleDisplay(pagePtr);
+            isRoutingActive = 0;
+            if (wasRoutingActive != isRoutingActive)
+            {
+                if (NAVAPP_OK == NavApp_Pause())
+                {
+                    (void)DashApp_ClearScreen();
+                    wasRoutingActive = isRoutingActive;
+                }
+            }
+            else
+            {
+                pagePtr = &pages[actualPage];
+                HandleDisplay(pagePtr);
+            }
         }
         else if (DASHAPP_OK == dashStatus)
         {
-            (void)NavApp_Continue();
+            isRoutingActive = 1;
+            if (wasRoutingActive != isRoutingActive)
+            {
+                DashApp_ClearScreen();
+                (void)NavApp_Continue();
+                wasRoutingActive = isRoutingActive;
+            }
         }
         #ifndef REDFIS_SINGLE_THREAD
         vTaskDelay(300 / portTICK_PERIOD_MS);
