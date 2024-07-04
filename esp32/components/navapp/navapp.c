@@ -109,6 +109,7 @@ void NavApp_Cyclic(void *pvParameters)
                         if (VWTP_OK == NAVAPP_DASHAPP_SENDTP(routingBuffer,routingBufferLen))
                         {
                             routingBufferLen = 0;
+                            NAVAPP_READYCALLBACK();
                         }
                     }
                     break;
@@ -187,11 +188,6 @@ void NavApp_TxConfirmation(uint8_t result)
     if (VWTP_OK == result)
     {
         waitForAck = 0;
-        if ((NAVAPP_WRITE == appState) && (0u == routingBufferLen))
-        {
-            // Messages are successfully routed, continue data stream
-            NAVAPP_READYCALLBACK();
-        }
     }
     else if (VWTP_ERR == result)
     {
@@ -248,9 +244,13 @@ uint8_t NavApp_Receive(uint8_t * dataPtr,uint16_t len)
             }
         }
         // New data received while buffer is still not empty, error case
-        else 
+        else if (NAVAPP_WRITE == appState)
         {
             retVal = VWTP_ERR;
+        }
+        else 
+        {
+            // Nothing to do here
         }
         break;
         case NAVAPP_CMD_ERR:

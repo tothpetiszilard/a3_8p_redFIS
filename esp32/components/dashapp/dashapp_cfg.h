@@ -21,8 +21,11 @@
 #define DASHAPP_CMD_REQSTATUS           ((uint8_t)0x53u)
 #define DASHAPP_CMD_WRITE               ((uint8_t)0x57u)
 
-#define DASHAPP_SENDTP(buffer, len)     (VwTp_Send(0u, buffer, len))
-#define DASHAPP_DISCONNECT()            (VwTp_Disconnect(0u))
+#define DASHA_VWTP_CHID                 (0u)
+
+#define DASHAPP_SENDTP(buffer, len)     (VwTp_Send(DASHA_VWTP_CHID, buffer, len))
+#define DASHAPP_READYCALLBACK()         (VwTp_RxReady_Cb(DASHA_VWTP_CHID))
+#define DASHAPP_DISCONNECT()            (VwTp_Disconnect(DASHA_VWTP_CHID))
 #define DASHAPP_GETIGNITION()           (SysStates_GetIgnition())
 
 const uint8_t DashApp_DspInit[] = 
