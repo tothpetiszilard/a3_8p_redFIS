@@ -27,7 +27,6 @@
 
 #define NAVAPP_SENDTP(buffer, len)             (VwTp_Send(NAVAPP_VWTP_CHID, buffer, len))
 #define NAVAPP_DASHAPP_SENDTP(buffer, len)     (VwTp_Send(NAVAPP_DASHAPP_VWTP_CHID, buffer, len))
-#define NAVAPP_READYCALLBACK()                 (VwTp_RxReady_Cb(NAVAPP_VWTP_CHID))
 #define NAVAPP_DISCONNECT()                    (VwTp_Disconnect(NAVAPP_VWTP_CHID))
 #define NAVAPP_GETIGNITION()                   (SysStates_GetIgnition())
 

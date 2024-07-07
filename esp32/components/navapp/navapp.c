@@ -31,7 +31,7 @@ static uint8_t reqPageId = 0;
 static uint8_t reqResp = 0xC0;
 static TaskHandle_t NavAppTaskHdl = NULL;
 static uint8_t routingBuffer[256];
-static uint8_t routingBufferLen = 0;
+static volatile uint8_t routingBufferLen = 0;
 
 // Rx
 static void NavApp_HandlePwrReport(uint8_t val);
@@ -108,8 +108,9 @@ void NavApp_Cyclic(void *pvParameters)
                     {
                         if (VWTP_OK == NAVAPP_DASHAPP_SENDTP(routingBuffer,routingBufferLen))
                         {
+                            vTaskSuspendAll();
                             routingBufferLen = 0;
-                            NAVAPP_READYCALLBACK();
+                            xTaskResumeAll();
                         }
                     }
                     break;
@@ -124,6 +125,7 @@ void NavApp_Cyclic(void *pvParameters)
                     NAVAPP_DISCONNECT();
                     appState = NAVAPP_INIT;
                     waitForAck = 0;
+                    routingBufferLen = 0;
                 }
             }
         }
@@ -136,7 +138,7 @@ void NavApp_Cyclic(void *pvParameters)
 NavApp_ReturnType NavApp_Pause(void)
 {
     NavApp_ReturnType retVal = NAVAPP_ERR;
-    if ((NAVAPP_READY == appState) || (NAVAPP_WRITE == appState))
+    if ((0 ==routingBufferLen) && ((NAVAPP_READY == appState) || (NAVAPP_WRITE == appState)))
     {
         // Send framem only if necessary
         if (0x84 != reqResp)
@@ -156,6 +158,16 @@ NavApp_ReturnType NavApp_Continue(void)
     {
         reqResp = 0x85; // ready, clear to send
         appState = NAVAPP_STATUS;
+        retVal = NAVAPP_OK;
+    }
+    return retVal;
+}
+
+NavApp_ReturnType NavApp_GetRxStatus(void)
+{
+    NavApp_ReturnType retVal = NAVAPP_BUSY;
+    if (0 == routingBufferLen)
+    {
         retVal = NAVAPP_OK;
     }
     return retVal;
@@ -199,9 +211,8 @@ void NavApp_TxConfirmation(uint8_t result)
     }
 }
 
-uint8_t NavApp_Receive(uint8_t * dataPtr,uint16_t len)
+void NavApp_Receive(uint8_t * dataPtr,uint16_t len)
 {
-    VwTp_ReturnType retVal = VWTP_OK;
     uint8_t cpyCnt = 0;
     switch(dataPtr[0])
     {
@@ -239,14 +250,20 @@ uint8_t NavApp_Receive(uint8_t * dataPtr,uint16_t len)
                 {
                     routingBuffer[cpyCnt] = dataPtr[cpyCnt];
                 }
+                vTaskSuspendAll();
                 routingBufferLen = len;
-                retVal = VWTP_ERR;
+                xTaskResumeAll();
+                
             }
         }
         // New data received while buffer is still not empty, error case
         else if (NAVAPP_WRITE == appState)
         {
-            retVal = VWTP_ERR;
+            //retVal = VWTP_ERR;
+            NAVAPP_DISCONNECT();
+            appState = NAVAPP_INIT;
+            waitForAck = 0;
+            routingBufferLen = 0;
         }
         else 
         {
@@ -254,14 +271,14 @@ uint8_t NavApp_Receive(uint8_t * dataPtr,uint16_t len)
         }
         break;
         case NAVAPP_CMD_ERR:
-        NAVAPP_DISCONNECT();
-        appState = NAVAPP_INIT;
-        waitForAck = 0;
+            NAVAPP_DISCONNECT();
+            appState = NAVAPP_INIT;
+            waitForAck = 0;
+            routingBufferLen = 0;
         break;
         default:
         break;
     }
-    return retVal;
 }
 
 

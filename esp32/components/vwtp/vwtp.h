@@ -15,8 +15,8 @@ extern VwTp_ReturnType VwTp_Connect(uint8_t ecuId);
 extern void VwTp_Disconnect(uint8_t chId);
 extern VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len);
 extern void VwTp_Receive(uint16_t canId, uint8_t dlc, uint8_t * dataPtr);
-extern VwTp_ReturnType VwTp_RxReady_Cb(uint8_t chId);
 
+//#define VWTP_DET    (1)
 
 #endif //VWTP_20_H_
 

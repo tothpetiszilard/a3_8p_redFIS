@@ -25,10 +25,11 @@ VwTp_ChannelType vwtp_channels[3] =
             .txId = 0x6c2u,
             #endif
             .blockSize = 0x0Fu,
-            .ackTimeout = 0x8Au,
-            .ips = 0x4Au,
+            .ackTimeout = 0x8Fu,
+            .ips = 0x4Fu,
             .txConfirmation = DashApp_TxConfirmation,
             .rxIndication = DashApp_Receive,
+            .appStatus = NULL
         }
 
     },
@@ -39,10 +40,11 @@ VwTp_ChannelType vwtp_channels[3] =
             .rxId = 0x0u,
             .txId = 0x200u,
             .blockSize = 0x0Fu,
-            .ackTimeout = 0x8Au,
-            .ips = 0x4Au,
+            .ackTimeout = 0x8Fu,
+            .ips = 0x4Fu,
             .txConfirmation = Kwp_TxConfirmation,
             .rxIndication = Kwp_Receive,
+            .appStatus = NULL
         }
 #if ((1 == CONFIG_VWTP_DASH_TX_ID_ALTERNATIVE) && ( 1 == CONFIG_VWTP_DASH_TX_ID_NAVIGATION_RNSE))
     #error "RNS-E and Alternative can not be selected in the same time!"
@@ -59,10 +61,11 @@ VwTp_ChannelType vwtp_channels[3] =
             .txId = 0x6c3u,
             #endif
             .blockSize = 0x0Fu,
-            .ackTimeout = 0x8Au,
-            .ips = 0x4Au,
+            .ackTimeout = 0x8Fu,
+            .ips = 0x4Fu,
             .txConfirmation = NavApp_TxConfirmation,
             .rxIndication = NavApp_Receive,
+            .appStatus = NavApp_GetRxStatus
         }
 #endif
     }

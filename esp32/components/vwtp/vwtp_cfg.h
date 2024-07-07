@@ -1,7 +1,8 @@
 #ifndef VWTP_20_CFG_H_
 #define VWTP_20_CFG_H_
 
-#include "stdint.h"
+#include <stdint.h>
+#include <stddef.h>
 #include "canWrapper.h"
 #include "sdkconfig.h"
 
@@ -53,7 +54,8 @@ typedef struct
     uint8_t ackTimeout; // time until wait for ack
     uint8_t ips; // inter-packet-space, time between two TP frames
     VwTp_ModeType mode;
-    uint8_t (*rxIndication)(uint8_t *data,uint16_t len); //callback: Data rx
+    uint8_t (*appStatus)(void); //callback: Get application state (ready or not)
+    void (*rxIndication)(uint8_t *data,uint16_t len); //callback: Data rx
     void (*txConfirmation)(uint8_t result); //callback: Data sent
 }VwTp_ChannelCfgType;
 
@@ -70,7 +72,6 @@ typedef struct
     uint16_t rxSize;
     uint16_t txSize;
     uint16_t txOffset;
-    VwTp_AppState appState;
     VwTp_StatesType txState;
     VwTp_StatesType rxState;
     VwTp_TxTasks txFlags;

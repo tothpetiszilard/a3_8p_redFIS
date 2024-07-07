@@ -145,9 +145,14 @@ void Dis_Cyclic(void *pvParameters)
             isRoutingActive = 1;
             if (wasRoutingActive != isRoutingActive)
             {
-                DashApp_ClearScreen();
-                (void)NavApp_Continue();
-                wasRoutingActive = isRoutingActive;
+                if (DASHAPP_OK == DashApp_ClearScreen())
+                {
+                    #ifndef REDFIS_SINGLE_THREAD
+                    vTaskDelay(300 / portTICK_PERIOD_MS);
+                    #endif
+                    (void)NavApp_Continue();
+                    wasRoutingActive = isRoutingActive;
+                }
             }
         }
         #ifndef REDFIS_SINGLE_THREAD
