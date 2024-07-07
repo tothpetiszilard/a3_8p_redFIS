@@ -2,11 +2,13 @@
 #define DIS_CFG_H_
 
 #include "stdint.h"
+#include "sdkconfig.h"
 #include "dashapp.h"
+#if (0 != CONFIG_DIS_NAV_ROUTING)
 #include "navapp.h"
+#endif //CONFIG_DIS_NAV_ROUTING
 #include "enginediag.h"
 #include "dashdiag.h"
-#include "sdkconfig.h"
 
 typedef struct
 {

@@ -16,11 +16,13 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
 static void VwTp_HandleRxTimeout(VwTp_ChannelType * const chPtr);
 static void VwTp_HandleConnect(VwTp_ChannelType * chPtr,uint8_t * dataPtr);
 static void VwTp_HandleCallbacks(VwTp_ChannelType * const chPtr);
+#if (0 != CONFIG_VWTP_NAV_ROUTING)
 static void VwTp_HandleRxPendingAck(VwTp_ChannelType * const chPtr);
+static void VwTp_sendAckNotReady(VwTp_ChannelType * const chPtr);
+#endif //CONFIG_VWTP_NAV_ROUTING
 static void VwTp_sendTpParams(VwTp_ChannelType * const chPtr, uint8_t response);
 static void VwTp_sendClose(VwTp_ChannelType * const chPtr);
 static void VwTp_sendAck(VwTp_ChannelType * const chPtr);
-static void VwTp_sendAckNotReady(VwTp_ChannelType * const chPtr);
 static void VwTp_sendBreak(VwTp_ChannelType * const chPtr);
 
 
@@ -144,7 +146,9 @@ void VwTp_Cyclic(void *pvParameters)
         {
             chPtr = &vwtp_channels[chId];
             VwTp_HandleTxTimeout(chPtr);
+            #if (0 != CONFIG_VWTP_NAV_ROUTING)
             VwTp_HandleRxPendingAck(chPtr); // Set ack ready if app finished already
+            #endif //CONFIG_VWTP_NAV_ROUTING
             VwTp_HandleTx(chPtr); // TODO: Requesting ACK after x transmitted frames 
             VwTp_HandleCallbacks(chPtr);
             VwTp_HandleRxTimeout(chPtr);
@@ -250,7 +254,7 @@ static void VwTp_HandleRxTimeout(VwTp_ChannelType * const chPtr)
         chPtr->rxTimeout = 0u;
     }
 }
-
+#if (0 != CONFIG_VWTP_NAV_ROUTING)
 static void VwTp_HandleRxPendingAck(VwTp_ChannelType * const chPtr)
 {
     if (VWTP_ACK == chPtr->rxState)
@@ -265,7 +269,7 @@ static void VwTp_HandleRxPendingAck(VwTp_ChannelType * const chPtr)
         }
     }
 }
-
+#endif //CONFIG_VWTP_NAV_ROUTING
 void VwTp_Disconnect(uint8_t chId)
 {
     VwTp_ChannelType * chPtr = NULL;
@@ -324,6 +328,7 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
                 {
                     chPtr->rxBuffer[i] = dataPtr[i+1];
                 }
+                #if (0 != CONFIG_VWTP_NAV_ROUTING)
                 if (NULL != chPtr->cfg.appStatus)
                 {
                     if (VWTP_OK != chPtr->cfg.appStatus())
@@ -336,6 +341,7 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
                     }
                 }
                 else 
+                #endif //CONFIG_VWTP_NAV_ROUTING
                 {
                     chPtr->txFlags.ack = VWTP_TXTASK_ACK_READY; // Ack + rxIndication
                 }
@@ -349,6 +355,7 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
                     chPtr->rxBuffer[chPtr->rxSize + i] = dataPtr[i+1];
                 }
                 chPtr->rxSize += (dlc-1);
+                #if (0 != CONFIG_VWTP_NAV_ROUTING)
                 if (NULL != chPtr->cfg.appStatus)
                 {
                     if (VWTP_OK != chPtr->cfg.appStatus())
@@ -361,6 +368,7 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
                     }
                 }
                 else 
+                #endif //CONFIG_VWTP_NAV_ROUTING
                 {
                     chPtr->txFlags.ack = VWTP_TXTASK_ACK_READY; // Ack + rxIndication
                 }
@@ -500,7 +508,7 @@ static void VwTp_sendAck(VwTp_ChannelType * const chPtr)
         xTaskResumeAll(); // End of critical section, interrupts enabled
     }
 }
-
+#if (0 != CONFIG_VWTP_NAV_ROUTING)
 static void VwTp_sendAckNotReady(VwTp_ChannelType * const chPtr)
 {
     uint8_t msg[1];
@@ -515,7 +523,7 @@ static void VwTp_sendAckNotReady(VwTp_ChannelType * const chPtr)
         xTaskResumeAll(); // End of critical section, interrupts enabled
     }
 }
-
+#endif //CONFIG_VWTP_NAV_ROUTING
 static void VwTp_sendClose(VwTp_ChannelType * const chPtr)
 {
     uint8_t tpClose[1] = {0xA8u};
@@ -655,14 +663,18 @@ static void VwTp_HandleTx(VwTp_ChannelType * const chPtr)
     }
     else if ((VWTP_IDLE == chPtr->txState) && (0 != chPtr->txFlags.ack))
     {
+        #if (0 != CONFIG_VWTP_NAV_ROUTING)
         if (VWTP_TXTASK_ACK_READY == chPtr->txFlags.ack)
         {
+            #endif //CONFIG_VWTP_NAV_ROUTING
             VwTp_sendAck(chPtr);
+            #if (0 != CONFIG_VWTP_NAV_ROUTING)
         }
         else
         {
             VwTp_sendAckNotReady(chPtr);
         }
+        #endif //CONFIG_VWTP_NAV_ROUTING
     }
     else if ((VWTP_IDLE == chPtr->txState) && (0 != chPtr->txFlags.brk))
     {

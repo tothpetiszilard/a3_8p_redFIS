@@ -5,5 +5,14 @@ menu "Driver Information System Configuration"
             default "n"
             help
                 Enables RESET button handling on the stalk-buttons (may needed for alternative VWTP ID)
+
+    config DIS_NAV_ROUTING
+        bool "Enable routing of navigation display data from RNS-E (last page)"
+        default "y"
+        help
+            You can enable or disable here the gateway functionality.
+            If it is enabled, and RNS-E custom firmware is installed,
+            RedFIS will route the navigation info to the dash if that page is selected.
+            You can not use this feature if you dont have custom firmware or FIS control is not enabled on the nav.
 endmenu # "DIS Configuration"
 

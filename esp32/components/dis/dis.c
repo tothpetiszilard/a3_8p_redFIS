@@ -57,8 +57,10 @@ void Dis_Init(void)
 
 void Dis_Cyclic(void *pvParameters)
 {
+    #if (0 != CONFIG_DIS_NAV_ROUTING)
     static uint8_t wasRoutingActive = 0;
     uint8_t isRoutingActive = 0;
+    #endif //CONFIG_DIS_NAV_ROUTING
     const DisPageType * pagePtr = NULL;
     DashApp_ReturnType dashStatus;
     #ifndef REDFIS_SINGLE_THREAD
@@ -69,7 +71,11 @@ void Dis_Cyclic(void *pvParameters)
         dashStatus = DashApp_GetStatus();
         if (DASHAPP_ERR != dashStatus)
         {
+            #if (0 != CONFIG_DIS_NAV_ROUTING)
             if ((STALKBUTTONS_UP == buttons) && ((1u + (sizeof(pages)/sizeof(pages[0])) > actualPage)))
+            #else
+            if ((STALKBUTTONS_UP == buttons) && (((sizeof(pages)/sizeof(pages[0])) > actualPage)))
+            #endif //CONFIG_DIS_NAV_ROUTING
             {
                 actualPage++;
                 actualRow = 0;
@@ -108,13 +114,16 @@ void Dis_Cyclic(void *pvParameters)
         }
         else 
         {
+            #if (0 != CONFIG_DIS_NAV_ROUTING)
             // Dashboard is not available, report it to Nav also
             (void)NavApp_Pause();
+            #endif //CONFIG_DIS_NAV_ROUTING
         }
         if (DASHAPP_OK == dashStatus)
         {
             if (actualPage < (sizeof(pages)/sizeof(pages[0])))
             {
+                #if (0 != CONFIG_DIS_NAV_ROUTING)
                 isRoutingActive = 0;
                 if (wasRoutingActive != isRoutingActive)
                 {
@@ -125,11 +134,13 @@ void Dis_Cyclic(void *pvParameters)
                     }
                 }
                 else
+                #endif //CONFIG_DIS_NAV_ROUTING
                 {
                     pagePtr = &pages[actualPage];
                     HandleDisplay(pagePtr);
                 }
             }
+            #if (0 != CONFIG_DIS_NAV_ROUTING)
             else if (0 == isRoutingActive) // routing is not active but it should be
             {
                 if (DASHAPP_OK == DashApp_ClearScreen())
@@ -143,7 +154,13 @@ void Dis_Cyclic(void *pvParameters)
                 (void)NavApp_Continue();
                 wasRoutingActive = isRoutingActive;
             }
+            else
+            {
+                // Nothing to do here
+            }
+            #endif //CONFIG_DIS_NAV_ROUTING
         }
+        #if (0 != CONFIG_DIS_NAV_ROUTING)
         else if ((DASHAPP_PAUSE == dashStatus) && (0 != isRoutingActive))
         {
             if (NAVAPP_OK == NavApp_Pause())
@@ -152,6 +169,11 @@ void Dis_Cyclic(void *pvParameters)
                 wasRoutingActive = isRoutingActive;
             }
         }
+        else
+        {
+            // Nothing to do here
+        }
+        #endif //CONFIG_DIS_NAV_ROUTING
         #ifndef REDFIS_SINGLE_THREAD
         vTaskDelay(300 / portTICK_PERIOD_MS);
         #endif

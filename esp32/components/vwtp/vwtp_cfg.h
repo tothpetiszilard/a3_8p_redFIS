@@ -54,7 +54,9 @@ typedef struct
     uint8_t ackTimeout; // time until wait for ack
     uint8_t ips; // inter-packet-space, time between two TP frames
     VwTp_ModeType mode;
+    #if (0 != CONFIG_VWTP_NAV_ROUTING)
     uint8_t (*appStatus)(void); //callback: Get application state (ready or not)
+    #endif
     void (*rxIndication)(uint8_t *data,uint16_t len); //callback: Data rx
     void (*txConfirmation)(uint8_t result); //callback: Data sent
 }VwTp_ChannelCfgType;
@@ -83,7 +85,11 @@ typedef struct
 #elif (1 == CONFIG_VWTP_DASH_TX_ID_ALTERNATIVE)
 extern VwTp_ChannelType vwtp_channels[2];
 #elif( 1 == CONFIG_VWTP_DASH_TX_ID_NAVIGATION_RNSE)
+    #if (0 != CONFIG_VWTP_NAV_ROUTING)
 extern VwTp_ChannelType vwtp_channels[3];
+    #else
+extern VwTp_ChannelType vwtp_channels[2];
+    #endif //CONFIG_VWTP_NAV_ROUTING
 #endif
 
 #endif //VWTP_20_CFG_H_

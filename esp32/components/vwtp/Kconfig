@@ -19,6 +19,15 @@ menu "VWTP Configuration"
                 6C2 will be used, dont select this if you have modified RNS-E installed.
     endchoice # VWTP_DASH_TX_ID
 
+    config VWTP_NAV_ROUTING
+        bool "Enable routing of navigation display data from RNS-E (see also DIS config)"
+        default "y"
+        help
+            You can enable or disable here the gateway functionality.
+            If it is enabled, and RNS-E custom firmware is installed,
+            RedFIS will route the navigation info to the dash if that page is selected.
+            You can not use this feature if you dont have custom firmware or FIS control is not enabled on the nav.
+
     config BENCH_TEST_MODE
             bool "Enable BENCH test mode"
             default "n"
