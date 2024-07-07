@@ -69,18 +69,6 @@ void Dis_Cyclic(void *pvParameters)
         dashStatus = DashApp_GetStatus();
         if (DASHAPP_ERR != dashStatus)
         {
-            if ((DASHAPP_PAUSE == dashStatus) && (0 != isRoutingActive))
-            {
-                isRoutingActive = 0;
-                if (isRoutingActive != wasRoutingActive)
-                {
-                    if (NAVAPP_OK == NavApp_Pause())
-                    {
-                        wasRoutingActive = isRoutingActive;
-                    }
-                }
-                
-            }
             if ((STALKBUTTONS_UP == buttons) && ((1u + (sizeof(pages)/sizeof(pages[0])) > actualPage)))
             {
                 actualPage++;
@@ -123,36 +111,45 @@ void Dis_Cyclic(void *pvParameters)
             // Dashboard is not available, report it to Nav also
             (void)NavApp_Pause();
         }
-        if (actualPage < (sizeof(pages)/sizeof(pages[0])))
+        if (DASHAPP_OK == dashStatus)
         {
-            isRoutingActive = 0;
-            if (wasRoutingActive != isRoutingActive)
+            if (actualPage < (sizeof(pages)/sizeof(pages[0])))
             {
-                if (NAVAPP_OK == NavApp_Pause())
+                isRoutingActive = 0;
+                if (wasRoutingActive != isRoutingActive)
                 {
-                    (void)DashApp_ClearScreen();
-                    wasRoutingActive = isRoutingActive;
+                    if (NAVAPP_OK == NavApp_Pause())
+                    {
+                        (void)DashApp_ClearScreen();
+                        wasRoutingActive = isRoutingActive;
+                    }
+                }
+                else
+                {
+                    pagePtr = &pages[actualPage];
+                    HandleDisplay(pagePtr);
                 }
             }
-            else
-            {
-                pagePtr = &pages[actualPage];
-                HandleDisplay(pagePtr);
-            }
-        }
-        else if (DASHAPP_OK == dashStatus)
-        {
-            isRoutingActive = 1;
-            if (wasRoutingActive != isRoutingActive)
+            else if (0 == isRoutingActive) // routing is not active but it should be
             {
                 if (DASHAPP_OK == DashApp_ClearScreen())
                 {
-                    #ifndef REDFIS_SINGLE_THREAD
-                    vTaskDelay(300 / portTICK_PERIOD_MS);
-                    #endif
-                    (void)NavApp_Continue();
-                    wasRoutingActive = isRoutingActive;
+                    isRoutingActive = 1;
                 }
+            }
+            else if (wasRoutingActive != isRoutingActive)
+            {
+                // routing is active but not yet displayed 
+                (void)NavApp_Continue();
+                wasRoutingActive = isRoutingActive;
+            }
+        }
+        else if ((DASHAPP_PAUSE == dashStatus) && (0 != isRoutingActive))
+        {
+            if (NAVAPP_OK == NavApp_Pause())
+            {
+                isRoutingActive = 0;
+                wasRoutingActive = isRoutingActive;
             }
         }
         #ifndef REDFIS_SINGLE_THREAD

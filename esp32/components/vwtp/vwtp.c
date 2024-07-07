@@ -16,6 +16,7 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
 static void VwTp_HandleRxTimeout(VwTp_ChannelType * const chPtr);
 static void VwTp_HandleConnect(VwTp_ChannelType * chPtr,uint8_t * dataPtr);
 static void VwTp_HandleCallbacks(VwTp_ChannelType * const chPtr);
+static void VwTp_HandleRxPendingAck(VwTp_ChannelType * const chPtr);
 static void VwTp_sendTpParams(VwTp_ChannelType * const chPtr, uint8_t response);
 static void VwTp_sendClose(VwTp_ChannelType * const chPtr);
 static void VwTp_sendAck(VwTp_ChannelType * const chPtr);
@@ -143,6 +144,7 @@ void VwTp_Cyclic(void *pvParameters)
         {
             chPtr = &vwtp_channels[chId];
             VwTp_HandleTxTimeout(chPtr);
+            VwTp_HandleRxPendingAck(chPtr); // Set ack ready if app finished already
             VwTp_HandleTx(chPtr); // TODO: Requesting ACK after x transmitted frames 
             VwTp_HandleCallbacks(chPtr);
             VwTp_HandleRxTimeout(chPtr);
@@ -246,6 +248,21 @@ static void VwTp_HandleRxTimeout(VwTp_ChannelType * const chPtr)
     else 
     {
         chPtr->rxTimeout = 0u;
+    }
+}
+
+static void VwTp_HandleRxPendingAck(VwTp_ChannelType * const chPtr)
+{
+    if (VWTP_ACK == chPtr->rxState)
+    {
+        // Check if app state changed 
+        if (NULL != chPtr->cfg.appStatus)
+        {
+            if (VWTP_OK == chPtr->cfg.appStatus())
+            {
+                chPtr->txFlags.ack = VWTP_TXTASK_ACK_READY;
+            }
+        }
     }
 }
 
