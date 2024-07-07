@@ -2,8 +2,13 @@
 #define DIS_CFG_H_
 
 #include "stdint.h"
+#include "sdkconfig.h"
 #include "dashapp.h"
+#if (0 != CONFIG_DIS_NAV_ROUTING)
+#include "navapp.h"
+#endif //CONFIG_DIS_NAV_ROUTING
 #include "enginediag.h"
+#include "dashdiag.h"
 
 typedef struct
 {
@@ -13,9 +18,11 @@ typedef struct
 
 typedef struct
 {
-    const uint8_t rows_used;
+    const uint8_t labelCnt;
     const DashApp_ContentType * const labels;
+    const uint8_t dataCnt;
     const DashApp_ContentType * const data;
+    const uint8_t diagCnt;
     const DiagIdType * const diagChs;
 }DisPageType;
 

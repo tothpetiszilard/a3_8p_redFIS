@@ -1,0 +1,37 @@
+menu "VWTP Configuration"
+
+    choice VWTP_DASH_TX_ID
+        prompt "Choose the CAN TX ID for the VWTP channel to the dashboard:"
+        default VWTP_DASH_TX_ID_NAVIGATION_RNSE
+        help
+            Choose the CAN TX ID for the VWTP channel to the dashboard.
+            6C0 is used by RNS-E, dont select it if you have unmodified RNS-E navigation installed.
+            6C2 is used by RNS-E Custom firmware, dont select it if you have custom firmware and selected FIS-Control option.
+
+        config VWTP_DASH_TX_ID_NAVIGATION_RNSE
+            bool "Use 6C0 (Navigation)"
+            help
+                6C0 will be used, dont select this if you have RNS-E navigation (with original FW) installed.
+
+        config VWTP_DASH_TX_ID_ALTERNATIVE
+            bool "Use 6C2 (Alternative)"
+            help
+                6C2 will be used, dont select this if you have modified RNS-E installed.
+    endchoice # VWTP_DASH_TX_ID
+
+    config VWTP_NAV_ROUTING
+        bool "Enable routing of navigation display data from RNS-E (see also DIS config)"
+        default "y"
+        help
+            You can enable or disable here the gateway functionality.
+            If it is enabled, and RNS-E custom firmware is installed,
+            RedFIS will route the navigation info to the dash if that page is selected.
+            You can not use this feature if you dont have custom firmware or FIS control is not enabled on the nav.
+
+    config BENCH_TEST_MODE
+            bool "Enable BENCH test mode"
+            default "n"
+            help
+                Enables bench test mode, continously sends KL15 (ignition) "ON" to dash
+endmenu # "VWTP Configuration"
+

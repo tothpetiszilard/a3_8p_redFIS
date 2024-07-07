@@ -7,18 +7,30 @@ const DiagIdType pageDiag[1][3] =
     {
         // Row 0
         {
+            #if (1 == CONFIG_BENCH_TEST_MODE)
+            .diagCh = DASHDIAG_CH_VEHICLESPEED,
+            #else
             .diagCh = ENGINEDIAG_CH_IATTEMP7, // did 7
+            #endif
             .timeout = 2000
         },
         // Row 1
         {
+            #if (1 == CONFIG_BENCH_TEST_MODE)
+            .diagCh = DASHDIAG_CH_OILPRESSURE,
+            #else
             .diagCh = ENGINEDIAG_CH_OILTEMP, // did 29
+            #endif
             .timeout = 10000
         },
         // Row 2
         {
-            .diagCh = ENGINEDIAG_CH_FUELTEMP, // did7
-            .timeout = 10000
+            #if (1 == CONFIG_BENCH_TEST_MODE)
+            .diagCh = DASHDIAG_CH_FUELLEVEL1,
+            #else
+            .diagCh = ENGINEDIAG_CH_EGTEMP74, // did74
+            #endif
+            .timeout = 6000
         }
         
     }
@@ -69,8 +81,12 @@ const DashApp_ContentType pageLabels[1][3] =
             .mode = DASHAPP_ADD,
             .posX = 1u,
             .posY = 11u,
+            #if (1 == CONFIG_BENCH_TEST_MODE)
+            .string = "Speed:",
+            #else
             .string = "IAT:",
-            .len = 4u,
+            #endif
+            .len = 5u,
             .ft = DASHAPP_FONT_S,
         },
         {
@@ -87,8 +103,8 @@ const DashApp_ContentType pageLabels[1][3] =
             .mode = DASHAPP_ADD,
             .posX = 1u,
             .posY = 31u,
-            .string = "Fuel:",
-            .len = 5u,
+            .string = "EGT:",
+            .len = 4u,
             .ft = DASHAPP_FONT_S
         }
     }

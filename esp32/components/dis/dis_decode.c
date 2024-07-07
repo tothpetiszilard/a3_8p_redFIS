@@ -206,7 +206,7 @@ uint8_t Dis_DecodeFrame(char *p, uint8_t *frameData)
       case 5: // a*(b-100)*0.1 �C
         val_s16 = frameData[1] * (frameData[2] - 100);
         val_s16 /= 10;
-        p += sprintf(p, "%d", val_s16);
+        p += sprintf(p, "%- 3d C", val_s16);
         break;
       
       case 6:  //0.001*a*b  	V

@@ -20,25 +20,34 @@ static TaskHandle_t disTaskHandle;
 static const DisPageType pages[1] = 
 {
     {
-        .rows_used = 3,
+        .labelCnt = 3,
         .labels = pageLabels[0],
+        .dataCnt = 3,
         .data = pageData[0],
+        .diagCnt = 3,
         .diagChs = pageDiag[0],
     }
 };
 
 static void Dis_CreateStrings(DashApp_ContentType * out, const DashApp_ContentType * const row, uint8_t * data);
-static void HandleDisplay(DisPageType * pagePtr);
-static DisDspTaskType dspTask = DIS_DISPLAY_C;
+static void HandleDisplay(const DisPageType * pagePtr);
 static StalkButtons_Type buttons = STALKBUTTONS_NOEVENT;
 static uint8_t actualPage = 0;
 static uint8_t actualRow = 0;
 static DashApp_ContentType dspBuffer;
 static uint8_t diagBuffer[3u];
+#if (1 == CONFIG_DIS_STALKBUTTON_RESET_EXIT_ENTER)
+static uint8_t exited = 0;
+#endif
 
 void Dis_Init(void)
 {
-    dspTask = DIS_DISPLAY_C;
+    
+    #if (1 == CONFIG_BENCH_TEST_MODE)
+    DashDiag_Init();
+    #else
+    EngineDiag_Init();
+    #endif
     #ifndef REDFIS_SINGLE_THREAD
     vTaskDelay(160u / portTICK_PERIOD_MS);
     
@@ -48,28 +57,123 @@ void Dis_Init(void)
 
 void Dis_Cyclic(void *pvParameters)
 {
-    DisPageType * pagePtr = NULL;
+    #if (0 != CONFIG_DIS_NAV_ROUTING)
+    static uint8_t wasRoutingActive = 0;
+    uint8_t isRoutingActive = 0;
+    #endif //CONFIG_DIS_NAV_ROUTING
+    const DisPageType * pagePtr = NULL;
+    DashApp_ReturnType dashStatus;
     #ifndef REDFIS_SINGLE_THREAD
     while(1)
     #endif
     {
         buttons = StalkButtons_Get();
-        if ((STALKBUTTONS_UP == buttons) && ((sizeof(pages)/sizeof(pages[0]) > actualPage)))
+        dashStatus = DashApp_GetStatus();
+        if (DASHAPP_ERR != dashStatus)
         {
-            actualPage++;
-            actualRow = 0;
+            #if (0 != CONFIG_DIS_NAV_ROUTING)
+            if ((STALKBUTTONS_UP == buttons) && ((1u + (sizeof(pages)/sizeof(pages[0])) > actualPage)))
+            #else
+            if ((STALKBUTTONS_UP == buttons) && (((sizeof(pages)/sizeof(pages[0])) > actualPage)))
+            #endif //CONFIG_DIS_NAV_ROUTING
+            {
+                actualPage++;
+                actualRow = 0;
+            }
+            else if ((STALKBUTTONS_DOWN == buttons) && (0 < actualPage))
+            {
+                actualPage--;
+                actualRow = 0;
+            }
+            #if (1 == CONFIG_DIS_STALKBUTTON_RESET_EXIT_ENTER)
+            else if (STALKBUTTONS_RESET == buttons)
+            {
+                if (0 == exited)
+                {
+                    if (DASHAPP_OK == DashApp_Exit())
+                    {
+                        exited = 1;
+                        actualRow = 0;
+                    }
+                    
+                }
+                else 
+                {
+                    if (DASHAPP_OK == DashApp_Enter())
+                    {
+                        exited = 0;
+                    }
+                }
+                
+            }
+            #endif
+            else
+            {
+                // Don't change the page 
+            }
         }
-        else if ((STALKBUTTONS_DOWN == buttons) && (0 < actualPage))
+        else 
         {
-            actualPage--;
-            actualRow = 0;
+            #if (0 != CONFIG_DIS_NAV_ROUTING)
+            // Dashboard is not available, report it to Nav also
+            (void)NavApp_Pause();
+            #endif //CONFIG_DIS_NAV_ROUTING
+        }
+        if (DASHAPP_OK == dashStatus)
+        {
+            if (actualPage < (sizeof(pages)/sizeof(pages[0])))
+            {
+                #if (0 != CONFIG_DIS_NAV_ROUTING)
+                isRoutingActive = 0;
+                if (wasRoutingActive != isRoutingActive)
+                {
+                    if (NAVAPP_OK == NavApp_Pause())
+                    {
+                        (void)DashApp_ClearScreen();
+                        wasRoutingActive = isRoutingActive;
+                    }
+                }
+                else
+                #endif //CONFIG_DIS_NAV_ROUTING
+                {
+                    pagePtr = &pages[actualPage];
+                    HandleDisplay(pagePtr);
+                }
+            }
+            #if (0 != CONFIG_DIS_NAV_ROUTING)
+            else if (0 == isRoutingActive) // routing is not active but it should be
+            {
+                if (DASHAPP_OK == DashApp_ClearScreen())
+                {
+                    isRoutingActive = 1;
+                }
+            }
+            else if (wasRoutingActive != isRoutingActive)
+            {
+                // routing is active but not yet displayed 
+                (void)NavApp_Continue();
+                wasRoutingActive = isRoutingActive;
+            }
+            else
+            {
+                // Nothing to do here
+            }
+            #endif //CONFIG_DIS_NAV_ROUTING
+        }
+        #if (0 != CONFIG_DIS_NAV_ROUTING)
+        else if ((DASHAPP_PAUSE == dashStatus) && (0 != isRoutingActive))
+        {
+            if (NAVAPP_OK == NavApp_Pause())
+            {
+                isRoutingActive = 0;
+                wasRoutingActive = isRoutingActive;
+            }
         }
         else
         {
-            // Don't change the page 
+            // Nothing to do here
         }
-        pagePtr = (DisPageType *)&pages[actualPage];        
-        HandleDisplay(pagePtr);
+        #endif //CONFIG_DIS_NAV_ROUTING
         #ifndef REDFIS_SINGLE_THREAD
         vTaskDelay(300 / portTICK_PERIOD_MS);
         #endif
@@ -77,67 +181,76 @@ void Dis_Cyclic(void *pvParameters)
 }
 
 
-static void HandleDisplay(DisPageType * pagePtr)
+static void HandleDisplay(const DisPageType * pagePtr)
 {
-    switch(dspTask)
+    static DisDspTaskType dspTask = DIS_DISPLAY_C;
+    DashApp_ReturnType status;
+    status = DashApp_GetStatus();
+    if (DASHAPP_OK == status)
     {
-        case DIS_DISPLAY_C:
-        if (actualRow < pagePtr->rows_used)
+        /* Display is ready */
+        switch(dspTask)
         {
-            // Send constant labels
-            if (DASHAPP_OK == DashApp_Print((DashApp_ContentType *)&pagePtr->labels[actualRow]))
+            case DIS_DISPLAY_C:
+            if (actualRow < pagePtr->labelCnt)
             {
-                actualRow++;
-            }
-        }
-        else
-        {
-            actualRow = 0;
-            dspTask = DIS_DISPLAY_V;
-        }
-        break;
-        case DIS_DISPLAY_V:
-        if (actualRow < (pagePtr->rows_used))
-        {
-            // Create strings from KWP data
-            if (ENGINEDIAG_OK == EngineDiag_GetChData(pagePtr->diagChs[actualRow].diagCh, diagBuffer, pagePtr->diagChs[actualRow].timeout))
-            {
-                Dis_CreateStrings(&dspBuffer,&pages[actualPage].data[actualRow],diagBuffer);
-                // Send values
-                if (DASHAPP_OK == DashApp_Print(&dspBuffer))
+                // Send constant labels
+                if (DASHAPP_OK == DashApp_Print((DashApp_ContentType *)&pagePtr->labels[actualRow]))
                 {
                     actualRow++;
                 }
             }
+            else
+            {
+                actualRow = 0;
+                dspTask = DIS_DISPLAY_V;
+            }
+            break;
+            case DIS_DISPLAY_V:
+            if (actualRow < (pagePtr->dataCnt))
+            {
+                // Create strings from KWP data
+                #if (1 == CONFIG_BENCH_TEST_MODE)
+                if (DIAG_OK == DashDiag_GetChData(pagePtr->diagChs[actualRow].diagCh, diagBuffer, pagePtr->diagChs[actualRow].timeout))
+                #else
+                if (DIAG_OK == EngineDiag_GetChData(pagePtr->diagChs[actualRow].diagCh, diagBuffer, pagePtr->diagChs[actualRow].timeout))
+                #endif
+                {
+                    Dis_CreateStrings(&dspBuffer,&pages[actualPage].data[actualRow],diagBuffer);
+                    // Send values
+                    if (DASHAPP_OK == DashApp_Print(&dspBuffer))
+                    {
+                        actualRow++;
+                    }
+                }
+            }
+            else
+            {
+                actualRow = 0;
+                dspTask = DIS_DISPLAY_C;
+            }
+            break;
+            default:
+            break;
         }
-        else
-        {
-            actualRow = 0;
-            dspTask = DIS_DISPLAY_C;
-        }
-        break;
-        default:
-        break;
+    }
+    else if (DASHAPP_ERR == status)
+    {
+        dspTask = DIS_DISPLAY_C;
+        actualRow = 0;
+        /* Display is not available */
+    }
+    else
+    {
+        /* A command is in progress */
     }
 }
 
 static void Dis_CreateStrings(DashApp_ContentType * out, const DashApp_ContentType * const row, uint8_t * data)
 {
-    int16_t val_s16 = 0;
-    //out->len = Dis_DecodeFrame(out->string,data);
-
     out->ft = row->ft;
     out->posX = row->posX;
     out->posY = row->posY;
     out->mode = row->mode;
-    if (data[0] == 5)
-    {
-        val_s16 = data[1] * (data[2] - 100);
-        val_s16 /= 10;
-        out->len = snprintf(out->string, sizeof(out->string),row->string ,val_s16 );
-    }
-    else 
-    {
-        out->len = snprintf(out->string, sizeof(out->string),"---" );
-    }
+    out->len = Dis_DecodeFrame(out->string,data);
 }

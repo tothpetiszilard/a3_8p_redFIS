@@ -2,7 +2,7 @@
 set(COMPONENT_REQUIRES "vwtp")
 set(COMPONENT_PRIV_REQUIRES )
 
-set(COMPONENT_SRCS "kwp.c" )
-set(COMPONENT_ADD_INCLUDEDIRS  "../dashapp" "../vwtp" "../sysState")
+set(COMPONENT_SRCS "navapp.c" )
+set(COMPONENT_ADD_INCLUDEDIRS "../vwtp" "../sysState")
 
 register_component()

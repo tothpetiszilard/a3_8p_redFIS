@@ -16,6 +16,10 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
 static void VwTp_HandleRxTimeout(VwTp_ChannelType * const chPtr);
 static void VwTp_HandleConnect(VwTp_ChannelType * chPtr,uint8_t * dataPtr);
 static void VwTp_HandleCallbacks(VwTp_ChannelType * const chPtr);
+#if (0 != CONFIG_VWTP_NAV_ROUTING)
+static void VwTp_HandleRxPendingAck(VwTp_ChannelType * const chPtr);
+static void VwTp_sendAckNotReady(VwTp_ChannelType * const chPtr);
+#endif //CONFIG_VWTP_NAV_ROUTING
 static void VwTp_sendTpParams(VwTp_ChannelType * const chPtr, uint8_t response);
 static void VwTp_sendClose(VwTp_ChannelType * const chPtr);
 static void VwTp_sendAck(VwTp_ChannelType * const chPtr);
@@ -130,6 +134,10 @@ void VwTp_Cyclic(void *pvParameters)
 {
     uint8_t chId = 0;
     VwTp_ChannelType * chPtr = NULL;
+    #if (1 == CONFIG_BENCH_TEST_MODE)
+    const uint8_t ignition [4] = {7,20,0,0};
+    uint8_t callCounter = 0;
+    #endif
     #ifndef REDFIS_SINGLE_THREAD
     while(1)
     #endif
@@ -138,13 +146,28 @@ void VwTp_Cyclic(void *pvParameters)
         {
             chPtr = &vwtp_channels[chId];
             VwTp_HandleTxTimeout(chPtr);
+            #if (0 != CONFIG_VWTP_NAV_ROUTING)
+            VwTp_HandleRxPendingAck(chPtr); // Set ack ready if app finished already
+            #endif //CONFIG_VWTP_NAV_ROUTING
             VwTp_HandleTx(chPtr); // TODO: Requesting ACK after x transmitted frames 
             VwTp_HandleCallbacks(chPtr);
             VwTp_HandleRxTimeout(chPtr);
             #ifndef REDFIS_SINGLE_THREAD
-            vTaskDelay((10u/(sizeof(vwtp_channels)/sizeof(vwtp_channels[0]))) / portTICK_PERIOD_MS);
+            //vTaskDelay((10u/(sizeof(vwtp_channels)/sizeof(vwtp_channels[0]))) / portTICK_PERIOD_MS);
+            vTaskDelay( 5u / portTICK_PERIOD_MS);
             #endif
         }
+        #if (1 == CONFIG_BENCH_TEST_MODE)
+        if (callCounter >= 20)
+        {
+            VWTP_SENDMESSAGE(0x575, 4, (uint8_t *)ignition);
+            callCounter = 0;
+        }
+        else 
+        {
+            callCounter++;
+        }
+        #endif
     }
 }
 
@@ -152,12 +175,12 @@ VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len)
 {
     VwTp_ChannelType * chPtr = NULL;
     VwTp_ReturnType retVal = VWTP_ERR;
-    uint8_t i = 0;
+    uint16_t i = 0;
     if (chId < (sizeof(vwtp_channels)/sizeof(vwtp_channels[0])))
     {
         chPtr = &vwtp_channels[chId];
         vTaskSuspendAll(); // Critical section, interrupts enabled
-        if (chPtr->txState == VWTP_IDLE)
+        if ((chPtr->txState == VWTP_IDLE) && (sizeof(chPtr->txBuffer) >= len))
         {
             chPtr->txSize = len;
             chPtr->txOffset = 0u;
@@ -173,6 +196,7 @@ VwTp_ReturnType VwTp_Send(uint8_t chId, uint8_t * buffer, uint16_t len)
             // Try to open channel
             chPtr->txFlags.params = VWTP_TPPARAMS_REQUEST;
             chPtr->rxState = VWTP_IDLE;
+            retVal = VWTP_PENDING;
         }
         else 
         {
@@ -230,7 +254,22 @@ static void VwTp_HandleRxTimeout(VwTp_ChannelType * const chPtr)
         chPtr->rxTimeout = 0u;
     }
 }
-
+#if (0 != CONFIG_VWTP_NAV_ROUTING)
+static void VwTp_HandleRxPendingAck(VwTp_ChannelType * const chPtr)
+{
+    if (VWTP_ACK == chPtr->rxState)
+    {
+        // Check if app state changed 
+        if (NULL != chPtr->cfg.appStatus)
+        {
+            if (VWTP_OK == chPtr->cfg.appStatus())
+            {
+                chPtr->txFlags.ack = VWTP_TXTASK_ACK_READY;
+            }
+        }
+    }
+}
+#endif //CONFIG_VWTP_NAV_ROUTING
 void VwTp_Disconnect(uint8_t chId)
 {
     VwTp_ChannelType * chPtr = NULL;
@@ -289,7 +328,23 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
                 {
                     chPtr->rxBuffer[i] = dataPtr[i+1];
                 }
-                chPtr->txFlags.ack = 1u; // Ack + rxIndication
+                #if (0 != CONFIG_VWTP_NAV_ROUTING)
+                if (NULL != chPtr->cfg.appStatus)
+                {
+                    if (VWTP_OK != chPtr->cfg.appStatus())
+                    {
+                        chPtr->txFlags.ack = VWTP_TXTASK_ACK_NOTREADY; // RCRRP
+                    }
+                    else
+                    {
+                        chPtr->txFlags.ack = VWTP_TXTASK_ACK_READY; // Ack + rxIndication
+                    }
+                }
+                else 
+                #endif //CONFIG_VWTP_NAV_ROUTING
+                {
+                    chPtr->txFlags.ack = VWTP_TXTASK_ACK_READY; // Ack + rxIndication
+                }
                 chPtr->rxState = VWTP_ACK;
             }
             else if (VWTP_WAIT == chPtr->rxState )
@@ -300,7 +355,23 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
                     chPtr->rxBuffer[chPtr->rxSize + i] = dataPtr[i+1];
                 }
                 chPtr->rxSize += (dlc-1);
-                chPtr->txFlags.ack = 1u; // Ack + rxIndication
+                #if (0 != CONFIG_VWTP_NAV_ROUTING)
+                if (NULL != chPtr->cfg.appStatus)
+                {
+                    if (VWTP_OK != chPtr->cfg.appStatus())
+                    {
+                        chPtr->txFlags.ack = VWTP_TXTASK_ACK_NOTREADY; // RCRRP
+                    }
+                    else
+                    {
+                        chPtr->txFlags.ack = VWTP_TXTASK_ACK_READY; // Ack + rxIndication
+                    }
+                }
+                else 
+                #endif //CONFIG_VWTP_NAV_ROUTING
+                {
+                    chPtr->txFlags.ack = VWTP_TXTASK_ACK_READY; // Ack + rxIndication
+                }
                 chPtr->rxState = VWTP_ACK;
             }
             else 
@@ -339,7 +410,7 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
                 chPtr->rxSize += (dlc-1);
                 if (0 == (dataPtr[0] & 0xF0u))
                 {
-                    chPtr->txFlags.ack = 1u; // Ack + rxIndication
+                    chPtr->txFlags.ack = VWTP_TXTASK_ACK_READY; // Ack + rxIndication
                 }
             }
             else 
@@ -383,7 +454,10 @@ static void VwTp_HandleRx(VwTp_ChannelType * chPtr,uint8_t dlc,uint8_t * dataPtr
     else if (0xA8u == dataPtr[0])
     {
         // Connection was terminated
-        VwTp_sendClose(chPtr);
+        if (VWTP_CONNECT != chPtr->txState)
+        {
+            VwTp_sendClose(chPtr);
+        }
     }
     else if (0xA4u == dataPtr[0])
     {
@@ -423,7 +497,7 @@ static void VwTp_sendAck(VwTp_ChannelType * const chPtr)
     uint8_t msg[1];
     uint8_t ackSeq;
     ackSeq = (chPtr->seqCntRx+1) & 0x0Fu;
-    msg[0] = 0xB0u | ackSeq; // ack
+    msg[0] = 0xB0u | ackSeq; // ack, ready
     if (CAN_OK == VWTP_SENDMESSAGE(chPtr->cfg.txId,sizeof(msg),msg))
     {
         vTaskSuspendAll(); // Critical section, interrupts enabled
@@ -434,7 +508,22 @@ static void VwTp_sendAck(VwTp_ChannelType * const chPtr)
         xTaskResumeAll(); // End of critical section, interrupts enabled
     }
 }
-
+#if (0 != CONFIG_VWTP_NAV_ROUTING)
+static void VwTp_sendAckNotReady(VwTp_ChannelType * const chPtr)
+{
+    uint8_t msg[1];
+    uint8_t ackSeq;
+    ackSeq = (chPtr->seqCntRx+1) & 0x0Fu;
+    msg[0] = 0x90u | ackSeq; // ack, not ready
+    if (CAN_OK == VWTP_SENDMESSAGE(chPtr->cfg.txId,sizeof(msg),msg))
+    {
+        vTaskSuspendAll(); // Critical section, interrupts enabled
+        chPtr->txFlags.ack = 0u;
+        // leave RX state in ACK, we need to send another ack to continue
+        xTaskResumeAll(); // End of critical section, interrupts enabled
+    }
+}
+#endif //CONFIG_VWTP_NAV_ROUTING
 static void VwTp_sendClose(VwTp_ChannelType * const chPtr)
 {
     uint8_t tpClose[1] = {0xA8u};
@@ -446,6 +535,7 @@ static void VwTp_sendClose(VwTp_ChannelType * const chPtr)
     chPtr->txSize = 0;
     chPtr->rxState = VWTP_IDLE;
     chPtr->txState = VWTP_CONNECT;
+    chPtr->txFlags.ack = 0;
     xTaskResumeAll(); // End of critical section, interrupts enabled
     VWTP_SENDMESSAGE(chPtr->cfg.txId,sizeof(tpClose),tpClose);
     // Reset diagnostics
@@ -573,7 +663,18 @@ static void VwTp_HandleTx(VwTp_ChannelType * const chPtr)
     }
     else if ((VWTP_IDLE == chPtr->txState) && (0 != chPtr->txFlags.ack))
     {
-        VwTp_sendAck(chPtr);
+        #if (0 != CONFIG_VWTP_NAV_ROUTING)
+        if (VWTP_TXTASK_ACK_READY == chPtr->txFlags.ack)
+        {
+            #endif //CONFIG_VWTP_NAV_ROUTING
+            VwTp_sendAck(chPtr);
+            #if (0 != CONFIG_VWTP_NAV_ROUTING)
+        }
+        else
+        {
+            VwTp_sendAckNotReady(chPtr);
+        }
+        #endif //CONFIG_VWTP_NAV_ROUTING
     }
     else if ((VWTP_IDLE == chPtr->txState) && (0 != chPtr->txFlags.brk))
     {

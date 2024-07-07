@@ -1,3 +1,5 @@
+/* Partial implementation of Keyword Protokoll */
+
 #ifndef KWP2000_CFG_H_
 #define KWP2000_CFG_H_
 

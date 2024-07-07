@@ -1,3 +1,5 @@
+/* Emulation of Navigation which communicates to Dash */
+
 #include "dashapp.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -18,7 +20,9 @@ typedef enum
     DASHAPP_SHOW=7,
     DASHAPP_WRITE=8,
     DASHAPP_READY=9,
+    DASHAPP_CLEAR = 10,
     DASHAPP_WAIT,
+    DASHAPP_SUSPEND,
     DASHAPP_SHUTDOWN
 } DashApp_StateType;
 
@@ -44,7 +48,7 @@ static void DashApp_Write(void);
 static void DashApp_Send2FResp(void);
 static void DashApp_Show(void);
 static void DashApp_InitDisplay(void);
-//static void DashApp_Clear(void);
+static void DashApp_Clear(void);
 
 void DashApp_Init(void)
 {
@@ -66,51 +70,122 @@ void DashApp_Cyclic(void *pvParameters)
     {
         if (0 == waitForAck)
         {
-            switch(appState)
+            if (0 != DASHAPP_GETIGNITION())
             {
-                case DASHAPP_INIT:
-                if (initTimeout < 120u)
+                switch(appState)
                 {
-                    initTimeout++;
+                    case DASHAPP_INIT:
+                    if (initTimeout < 120u)
+                    {
+                        initTimeout++;
+                    }
+                    else 
+                    {
+                        initTimeout = 0;
+                        appState = DASHAPP_PWRSTATE;
+                    }
+                    break;
+                    case DASHAPP_PWRSTATE:
+                    DashApp_SendPwrReport();
+                    break;
+                    case DASHAPP_IDREQ:
+                    DashApp_GetDashID();
+                    break;
+                    case DASHAPP_PAGEREQ:
+                    DashApp_ReqMfaPage(0u);
+                    break;
+                    case DASHAPP_GETSTATUS:
+                    DashApp_ReqArea(0u,27u,64u,48u,1u);
+                    break;
+                    case DASHAPP_SEND2F:
+                    DashApp_Send2FResp();
+                    break;
+                    case DASHAPP_PREWRITE:
+                    DashApp_InitDisplay();
+                    break;
+                    case DASHAPP_WRITE:
+                    DashApp_Write();
+                    break;
+                    case DASHAPP_SHOW:
+                    DashApp_Show();// Show page 
+                    break;
+                    case DASHAPP_CLEAR:
+                    DashApp_Clear();// Delete page 
+                    break;
+                    default:
+                    break;
                 }
-                else 
+            }
+            else
+            {
+                if (DASHAPP_INIT != appState)
                 {
-                    initTimeout = 0;
-                    appState = DASHAPP_PWRSTATE;
+                    DASHAPP_DISCONNECT();
+                    appState = DASHAPP_INIT;
+                    waitForAck = 0;
                 }
-                break;
-                case DASHAPP_PWRSTATE:
-                DashApp_SendPwrReport();
-                break;
-                case DASHAPP_IDREQ:
-                DashApp_GetDashID();
-                break;
-                case DASHAPP_PAGEREQ:
-                DashApp_ReqMfaPage(0u);
-                break;
-                case DASHAPP_GETSTATUS:
-                DashApp_ReqArea(0u,27u,64u,48u,1u);
-                break;
-                case DASHAPP_SEND2F:
-                DashApp_Send2FResp();
-                break;
-                case DASHAPP_PREWRITE:
-                DashApp_InitDisplay();
-                break;
-                case DASHAPP_WRITE:
-                DashApp_Write();
-                break;
-                case DASHAPP_SHOW:
-                DashApp_Show();// Show page 
-                break;
-                default:
-                break;
             }
         }
         #ifndef REDFIS_SINGLE_THREAD
         vTaskDelay(30 / portTICK_PERIOD_MS);
         #endif
     }
+}
+
+DashApp_ReturnType DashApp_GetStatus(void)
+{
+    DashApp_ReturnType retVal = DASHAPP_ERR;
+    if (DASHAPP_READY == appState)
+    {
+        retVal = DASHAPP_OK;
+    }
+    else if (DASHAPP_WRITE == appState)
+    {
+        retVal = DASHAPP_BUSY;
+    }
+    else if (DASHAPP_SUSPEND == appState)
+    {
+        retVal = DASHAPP_PAUSE;
+    }
+    else 
+    {
+        /* Return not ok */
+    }
+    return retVal;
+}
+
+DashApp_ReturnType DashApp_Enter(void)
+{
+    DashApp_ReturnType retVal = DASHAPP_ERR;
+    if (DASHAPP_SUSPEND == appState)
+    {
+        appState = DASHAPP_GETSTATUS;
+        retVal = DASHAPP_OK;
+    }
+    else 
+    {
+        /* Return not ok */
+    }
+    return retVal;
+}
+
+DashApp_ReturnType DashApp_Exit(void)
+{
+    DashApp_ReturnType retVal = DASHAPP_ERR;
+    if (DASHAPP_READY == appState)
+    {
+        appState = DASHAPP_CLEAR;
+        retVal = DASHAPP_OK;
+    }
+    else if (DASHAPP_WRITE == appState)
+    {
+        retVal = DASHAPP_BUSY;
+    }
+    else 
+    {
+        /* Return not ok */
+    }
+    return retVal;
 }
 
 DashApp_ReturnType DashApp_Print(const DashApp_ContentType * const content)
@@ -140,6 +215,20 @@ DashApp_ReturnType DashApp_Print(const DashApp_ContentType * const content)
         }
         retVal = DASHAPP_OK;
         xTaskResumeAll(); // End of critical section, interrupts enabled
+    }
+    return retVal;
+}
+
+DashApp_ReturnType DashApp_ClearScreen(void)
+{
+    DashApp_ReturnType retVal = DASHAPP_ERR;
+    if (DASHAPP_READY == appState)
+    {
+        vTaskSuspendAll(); // Critical section, interrupts enabled
+        dspContent.len = 0;
+        appState = DASHAPP_PREWRITE;
+        xTaskResumeAll(); // End of critical section, interrupts enabled
+        retVal = DASHAPP_OK;
     }
     return retVal;
 }
@@ -343,6 +432,17 @@ static void DashApp_Show(void)
     }
 }
 
+static void DashApp_Clear(void)
+{
+    uint8_t msg[1];
+    msg[0] = DASHAPP_CMD_CLEAR;
+    if (VWTP_OK == DASHAPP_SENDTP(msg,sizeof(msg)))
+    {
+        waitForAck = 1u;
+        appState = DASHAPP_SUSPEND;
+    }
+}
+
 static void DashApp_HandlePwrState(uint8_t val)
 {
     ignitionState = val;
@@ -366,7 +466,7 @@ static void DashApp_HandleReqStatus(uint8_t val)
     else if ((0x04 == val) || (0x84 == val))
     {
         // Request OK, busy, wait for 85
-        appState = DASHAPP_WAIT;
+        appState = DASHAPP_SUSPEND;
     }
     else if (0x85 == val)
     {
