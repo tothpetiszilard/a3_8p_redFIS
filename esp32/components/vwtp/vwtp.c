@@ -135,7 +135,7 @@ void VwTp_Cyclic(void *pvParameters)
     uint8_t chId = 0;
     VwTp_ChannelType * chPtr = NULL;
     #if (1 == CONFIG_BENCH_TEST_MODE)
-    const uint8_t ignition [4] = {7,20,0,0};
+    const uint8_t ignition [4] = {7,0x20,0,0};
     uint8_t callCounter = 0;
     #endif
     #ifndef REDFIS_SINGLE_THREAD
