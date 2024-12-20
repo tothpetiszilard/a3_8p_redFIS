@@ -15318,7 +15318,7 @@
 		(descr "SOIC, 8 Pin (JEDEC MS-012AA, https://www.analog.com/media/en/package-pcb-resources/package/pkg_pdf/soic_narrow-r/r_8.pdf), generated with kicad-footprint-generator ipc_gullwing_generator.py")
 		(tags "SOIC SO")
 		(property "Reference" "U4"
-			(at 0 3.4 0)
+			(at 0 -3.485 0)
 			(layer "B.SilkS")
 			(uuid "ef61aaa9-bdd9-4aad-b186-2602a60495f7")
 			(effects
