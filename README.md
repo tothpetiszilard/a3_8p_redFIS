@@ -11,6 +11,9 @@ https://www.urotuning.com/products/polar-fis-advanced-multi-function-display-pf-
 <b> Picture about the current status:</b><br>
 <img src="https://github.com/tothpetiszilard/a3_8p_redFIS/blob/main/media/alive.png" alt="picture">
 
+## Connections description
+https://github.com/tothpetiszilard/a3_8p_redFIS/blob/main/connection.md
+
 ## Compatibility:
 Selectable in "menuconfig":
 - You can use Alternative VWTP CANID if you have RNS-E (Audi navigation with color display) installed and your dashboards part number is "8P0 920 930". Don't select "FIS-Control" in your RNS-E custom firmware in this case. Enter/exit FIS scenarios are a bit buggy.
