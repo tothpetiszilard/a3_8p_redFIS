@@ -9,7 +9,9 @@
 typedef uint8_t Can_ReturnType;
 
 extern void Can_Init(void);
+#ifdef USE_OLD_TWAI_DRIVER
 extern void Can_Receive(void *pvParameters);
+#endif
 extern void Can_DeInit(void);
 extern Can_ReturnType Can_Write(uint16_t id,uint8_t len,uint8_t * dataPtr);
 

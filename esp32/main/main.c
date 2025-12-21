@@ -21,7 +21,8 @@ void app_main()
     #endif
     esp_sleep_wakeup_cause_t wakeup_reason;
 
-    wakeup_reason = esp_sleep_get_wakeup_cause();
+    wakeup_reason = esp_sleep_get_wakeup_causes();
+    /* wakeup reason bitmap is not really a bitmap, so BUGFIX needed in esp-idf */
     switch(wakeup_reason)
     {
         case ESP_SLEEP_WAKEUP_EXT0 : printf("Wakeup caused by external signal using RTC_IO\n"); break;
