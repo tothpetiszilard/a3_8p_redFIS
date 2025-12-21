@@ -52,3 +52,6 @@ Module.symvers
 Mkfile.old
 dkms.conf
 esp32/.cache
+.DS_Store
+*.old
+*.lck
