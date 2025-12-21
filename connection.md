@@ -35,10 +35,10 @@ Reference: https://www.csselectronics.com/cdn/shop/files/DB9-Generic-Adapter-Cab
 - Pin #32 -> Immo reader (RFID) coil
 
 ## ESP32 Development board version
-If you are using an ESP32 development board instead of my PCB design, it is enough to tap the CAN wires:
-- Tap Pin#29 of cluster and connect to CAN H on your board (or external transceiver)
-- Tap Pin#30 of cluster and connect to CAN L on your board (or external transceiver)
-- 5V power supply can be safely provided from a random USB phone charger
+- If you are using an ESP32 development board instead of my PCB design, it is enough to tap the CAN wires:
+-> Tap Pin#29 of cluster and connect to CAN H on your board (or external transceiver)
+-> Tap Pin#30 of cluster and connect to CAN L on your board (or external transceiver)
+5V power supply can be safely provided from a random USB phone charger
 
 **Be careful** the CAN transceivers are usually 5V devices, you need a level shifter before the ESP32 pins (they are expecting 3v3)!<br>
 Or you can use one with a VDDIO (pin#5) input (for example: SIT1051AT/3 or TJA1044**GT**) directly.
