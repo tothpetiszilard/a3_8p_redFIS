@@ -22,4 +22,5 @@ extern Diag_ReturnType DashDiag_Init(void);
 #define DashDiag_DeInit()    (Diag_DeInit())
 extern Diag_ReturnType DashDiag_GetChData(const DashDiag_ChannelIdType ch, uint8_t * dataPtr, uint32_t timeout);
 
+extern uint32_t DashDiag_FblKey(uint32_t v11);
 #endif //DASH_DIAG_H_
